@@ -74,6 +74,50 @@ pub struct VariableAssignment {
     pub file_path: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct DomXssFinding {
+    pub kind: &'static str,
+    pub snippet: String,
+    pub line: usize,
+    pub col: usize,
+    pub file_path: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExternalMessageFinding {
+    pub snippet: String,
+    pub line: usize,
+    pub col: usize,
+    pub file_path: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct KeyloggerFinding {
+    pub trigger: String,
+    pub snippet: String,
+    pub line: usize,
+    pub col: usize,
+    pub file_path: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct StorageSyncCredentialFinding {
+    pub key_name: String,
+    pub snippet: String,
+    pub line: usize,
+    pub col: usize,
+    pub file_path: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct RemoteWasmFinding {
+    pub api_name: String,
+    pub snippet: String,
+    pub line: usize,
+    pub col: usize,
+    pub file_path: String,
+}
+
 pub struct AstScanner<'a> {
     pub file_path: &'a str,
     pub source_map: &'a Lrc<SourceMap>,
@@ -90,6 +134,13 @@ pub struct AstScanner<'a> {
     pub taint_sources: Vec<TaintSourceFinding>,
     pub taint_sinks: Vec<TaintSinkFinding>,
     pub assignments: Vec<VariableAssignment>,
+
+    // Advanced security findings
+    pub dom_xss_findings: Vec<DomXssFinding>,
+    pub insecure_external_msg_findings: Vec<ExternalMessageFinding>,
+    pub keylogger_findings: Vec<KeyloggerFinding>,
+    pub storage_sync_findings: Vec<StorageSyncCredentialFinding>,
+    pub remote_wasm_findings: Vec<RemoteWasmFinding>,
 }
 
 impl<'a> AstScanner<'a> {
@@ -108,6 +159,11 @@ impl<'a> AstScanner<'a> {
             taint_sources: Vec::new(),
             taint_sinks: Vec::new(),
             assignments: Vec::new(),
+            dom_xss_findings: Vec::new(),
+            insecure_external_msg_findings: Vec::new(),
+            keylogger_findings: Vec::new(),
+            storage_sync_findings: Vec::new(),
+            remote_wasm_findings: Vec::new(),
         }
     }
 
@@ -206,6 +262,32 @@ impl<'a> Visit for AstScanner<'a> {
     }
 
     fn visit_assign_expr(&mut self, n: &AssignExpr) {
+        if let AssignTarget::Simple(SimpleAssignTarget::Member(member)) = &n.left {
+            let prop_name = match &member.prop {
+                MemberProp::Ident(ident) => Some(ident.sym.to_string()),
+                MemberProp::Computed(comp) => {
+                    if let Expr::Lit(Lit::Str(s)) = &*comp.expr {
+                        Some(s.value.to_string_lossy().to_string())
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            };
+            if let Some(p) = prop_name {
+                if p == "innerHTML" || p == "outerHTML" {
+                    let loc = self.loc(n.span);
+                    self.dom_xss_findings.push(DomXssFinding {
+                        kind: if p == "innerHTML" { "innerHTML assignment" } else { "outerHTML assignment" },
+                        snippet: format!(".{} = ...", p),
+                        line: loc.line,
+                        col: loc.col_display,
+                        file_path: self.file_path.to_string(),
+                    });
+                }
+            }
+        }
+
         let target_name = match &n.left {
             AssignTarget::Simple(simple) => match simple {
                 SimpleAssignTarget::Ident(ident) => Some(ident.id.sym.to_string()),
@@ -436,14 +518,127 @@ impl<'a> Visit for AstScanner<'a> {
                         line: loc.line,
                         file_path: self.file_path.to_string(),
                     });
-                } else if chain == "document.write" || chain.ends_with(".contentDocument.write") {
+                } else if chain == "document.write" || chain == "document.writeln" || chain.ends_with(".contentDocument.write") || chain.ends_with(".insertAdjacentHTML") {
                     self.dynamic_code.push(DynamicCodeRecord {
-                        kind: "document.write DOM injection",
-                        snippet: chain,
+                        kind: "document.write / insertAdjacentHTML DOM injection",
+                        snippet: chain.clone(),
                         line: loc.line,
                         col: loc.col_display,
                         file_path: self.file_path.to_string(),
                     });
+                    self.dom_xss_findings.push(DomXssFinding {
+                        kind: if chain.ends_with(".insertAdjacentHTML") { "insertAdjacentHTML" } else { "document.write" },
+                        snippet: format!("{}(...)", chain),
+                        line: loc.line,
+                        col: loc.col_display,
+                        file_path: self.file_path.to_string(),
+                    });
+                }
+
+                // Check insecure external messaging: chrome.runtime.onMessageExternal.addListener
+                if chain == "chrome.runtime.onMessageExternal.addListener" || chain == "browser.runtime.onMessageExternal.addListener" {
+                    if let Some(arg0) = n.args.first() {
+                        if !callback_validates_sender(&arg0.expr) {
+                            self.insecure_external_msg_findings.push(ExternalMessageFinding {
+                                snippet: format!("{}(...)", chain),
+                                line: loc.line,
+                                col: loc.col_display,
+                                file_path: self.file_path.to_string(),
+                            });
+                        }
+                    }
+                }
+
+                // Check keylogger / input snooping
+                if chain.ends_with("addEventListener") {
+                    if let Some(arg0) = n.args.first() {
+                        if let Expr::Lit(Lit::Str(s)) = &*arg0.expr {
+                            let val = s.value.to_string_lossy();
+                            if val == "keydown" || val == "keypress" || val == "keyup" {
+                                self.keylogger_findings.push(KeyloggerFinding {
+                                    trigger: format!("Keyboard listener '{}'", val),
+                                    snippet: format!("{}(\"{}\", ...)", chain, val),
+                                    line: loc.line,
+                                    col: loc.col_display,
+                                    file_path: self.file_path.to_string(),
+                                });
+                            }
+                        }
+                    }
+                } else if chain.ends_with("querySelector") || chain.ends_with("querySelectorAll") || chain == "$" || chain == "jQuery" {
+                    if let Some(arg0) = n.args.first() {
+                        if let Expr::Lit(Lit::Str(s)) = &*arg0.expr {
+                            let val = s.value.to_string_lossy().to_lowercase();
+                            if val.contains("password") && (val.contains("input") || val.contains("type")) {
+                                self.keylogger_findings.push(KeyloggerFinding {
+                                    trigger: "Password input selector query".into(),
+                                    snippet: format!("{}(\"{}\")", chain, s.value.to_string_lossy()),
+                                    line: loc.line,
+                                    col: loc.col_display,
+                                    file_path: self.file_path.to_string(),
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // Check storing credentials in plain chrome.storage.sync
+                if chain == "chrome.storage.sync.set" || chain == "browser.storage.sync.set" {
+                    if let Some(arg0) = n.args.first() {
+                        if let Expr::Object(obj) = &*arg0.expr {
+                            for prop in &obj.props {
+                                if let PropOrSpread::Prop(p) = prop {
+                                    if let Prop::KeyValue(kv) = &**p {
+                                        let key_str = match &kv.key {
+                                            PropName::Ident(id) => id.sym.to_string(),
+                                            PropName::Str(s) => s.value.to_string_lossy().to_string(),
+                                            _ => String::new(),
+                                        };
+                                        let key_lower = key_str.to_lowercase();
+                                        if key_lower.contains("token") || key_lower.contains("password") || key_lower.contains("secret") || key_lower.contains("auth") || key_lower.contains("api_key") || key_lower.contains("apikey") {
+                                            self.storage_sync_findings.push(StorageSyncCredentialFinding {
+                                                key_name: key_str.clone(),
+                                                snippet: format!("{}({{ \"{}\": ... }})", chain, key_str),
+                                                line: loc.line,
+                                                col: loc.col_display,
+                                                file_path: self.file_path.to_string(),
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Check remote WebAssembly compilation (CWS-012)
+                if chain.starts_with("WebAssembly.") {
+                    let mut is_remote = false;
+                    for arg in &n.args {
+                        if let Expr::Call(inner_call) = &*arg.expr {
+                            if let Callee::Expr(inner_callee) = &inner_call.callee {
+                                if let Some(inner_chain) = self.check_member_chain(inner_callee) {
+                                    if inner_chain == "fetch" {
+                                        is_remote = true;
+                                    }
+                                }
+                            }
+                        } else if let Expr::Lit(Lit::Str(s)) = &*arg.expr {
+                            let s_val = s.value.to_string_lossy();
+                            if s_val.starts_with("http://") || s_val.starts_with("https://") {
+                                is_remote = true;
+                            }
+                        }
+                    }
+                    if is_remote {
+                        self.remote_wasm_findings.push(RemoteWasmFinding {
+                            api_name: chain.clone(),
+                            snippet: format!("{}(fetch(\"https://...\"))", chain),
+                            line: loc.line,
+                            col: loc.col_display,
+                            file_path: self.file_path.to_string(),
+                        });
+                    }
                 }
             }
         }
@@ -580,4 +775,24 @@ fn classify_source(api: &str) -> &'static str {
     } else {
         "Sensitive Storage/Data Source"
     }
+}
+
+fn callback_validates_sender(expr: &Expr) -> bool {
+    struct SenderVisitor {
+        has_validation: bool,
+    }
+    impl Visit for SenderVisitor {
+        fn visit_member_expr(&mut self, n: &MemberExpr) {
+            if let MemberProp::Ident(id) = &n.prop {
+                let s = id.sym.as_ref();
+                if s == "origin" || s == "id" || s == "url" {
+                    self.has_validation = true;
+                }
+            }
+            n.visit_children_with(self);
+        }
+    }
+    let mut v = SenderVisitor { has_validation: false };
+    expr.visit_with(&mut v);
+    v.has_validation
 }

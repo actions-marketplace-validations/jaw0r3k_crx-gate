@@ -52,6 +52,8 @@ pub struct ContentScriptEntry {
     #[serde(default)]
     pub css: Vec<String>,
     pub run_at: Option<String>,
+    pub all_frames: Option<bool>,
+    pub match_about_blank: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -338,6 +340,58 @@ pub fn validate_manifest(manifest: &ManifestData, package: &ExtensionPackage) ->
                         });
                         break;
                     }
+                }
+            }
+        }
+    }
+
+    // 13. Metadata & Description Quality (CWS-011)
+    match &manifest.description {
+        None => {
+            issues.push(ValidationIssue {
+                code: "CWS-011".into(),
+                severity: "medium".into(),
+                message: "Manifest is missing a 'description'. Chrome Web Store requires an informative description of the extension's purpose.".into(),
+                file_reference: Some("manifest.json".into()),
+                remediation: "Add a meaningful 'description' (at least 25 characters) to manifest.json.".into(),
+            });
+        }
+        Some(desc) if desc.trim().len() < 25 => {
+            issues.push(ValidationIssue {
+                code: "CWS-011".into(),
+                severity: "medium".into(),
+                message: format!("Manifest description is too short ({} chars: '{}'). CWS automated reviewers reject placeholder or non-descriptive text.", desc.trim().len(), desc.trim()),
+                file_reference: Some("manifest.json".into()),
+                remediation: "Expand 'description' to at least 25 characters clearly describing functionality.".into(),
+            });
+        }
+        _ => {}
+    }
+
+    // 14. Nuclear Debugger Permission (CWS-013)
+    if manifest.permissions.iter().any(|p| p == "debugger") {
+        issues.push(ValidationIssue {
+            code: "CWS-013".into(),
+            severity: "high".into(),
+            message: "Extension requests the privileged 'debugger' permission. This grants full Chrome DevTools Protocol control over all network traffic and DOM, triggering Tier-3 manual CWS security reviews and extreme blast radius.".into(),
+            file_reference: Some("manifest.json".into()),
+            remediation: "Remove 'debugger' permission unless building specialized debugging developer tools.".into(),
+        });
+    }
+
+    // 15. Content Script Frame Isolation (CWS-014)
+    for cs in &manifest.content_scripts {
+        if cs.all_frames == Some(true) {
+            for m in &cs.matches {
+                if m == "<all_urls>" || m == "*://*/*" || m.starts_with("*://*") {
+                    issues.push(ValidationIssue {
+                        code: "CWS-014".into(),
+                        severity: "medium".into(),
+                        message: format!("Content script declares 'all_frames: true' combined with wildcard pattern '{}'. Scripts will be injected into untrusted cross-origin ad iframes and about:blank.", m),
+                        file_reference: Some("manifest.json".into()),
+                        remediation: "Set 'all_frames: false' or restrict match patterns to specific trusted domains.".into(),
+                    });
+                    break;
                 }
             }
         }

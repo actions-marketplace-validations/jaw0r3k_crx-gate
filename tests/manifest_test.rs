@@ -228,3 +228,95 @@ fn test_manifest_validation_catches_web_accessible_resources_wildcard() {
     let issues_safe = validate_manifest(&manifest_safe, &empty_pkg);
     assert!(!issues_safe.iter().any(|i| i.code == "SEC-WAR-WILDCARD"));
 }
+
+#[test]
+fn test_manifest_metadata_quality_check() {
+    let empty_pkg = ExtensionPackage {
+        root_path: std::path::PathBuf::from("dummy"),
+        package_type: crx_gate::archive::PackageType::Directory,
+        extension_id: None,
+        files: HashMap::new(),
+        total_size: 0,
+    };
+
+    // 1. Missing description
+    let manifest_missing = ManifestData {
+        manifest_version: Some(3),
+        name: Some("Valid Name".into()),
+        version: Some("1.0.0".into()),
+        description: None,
+        ..Default::default()
+    };
+    let issues1 = validate_manifest(&manifest_missing, &empty_pkg);
+    assert!(issues1.iter().any(|i| i.code == "CWS-011"));
+
+    // 2. Short placeholder description (< 25 chars)
+    let manifest_short = ManifestData {
+        manifest_version: Some(3),
+        name: Some("Valid Name".into()),
+        version: Some("1.0.0".into()),
+        description: Some("My tool".into()),
+        ..Default::default()
+    };
+    let issues2 = validate_manifest(&manifest_short, &empty_pkg);
+    assert!(issues2.iter().any(|i| i.code == "CWS-011"));
+
+    // 3. Adequate description (>= 25 chars)
+    let manifest_good = ManifestData {
+        manifest_version: Some(3),
+        name: Some("Valid Name".into()),
+        version: Some("1.0.0".into()),
+        description: Some("A productivity timer that blocks distractions and tracks study hours.".into()),
+        ..Default::default()
+    };
+    let issues3 = validate_manifest(&manifest_good, &empty_pkg);
+    assert!(!issues3.iter().any(|i| i.code == "CWS-011"));
+}
+
+#[test]
+fn test_nuclear_debugger_permission_check() {
+    let empty_pkg = ExtensionPackage {
+        root_path: std::path::PathBuf::from("dummy"),
+        package_type: crx_gate::archive::PackageType::Directory,
+        extension_id: None,
+        files: HashMap::new(),
+        total_size: 0,
+    };
+
+    let manifest_debugger = ManifestData {
+        manifest_version: Some(3),
+        name: Some("Dev Extension".into()),
+        version: Some("1.0.0".into()),
+        description: Some("Extensive developer profiling extension with detailed logs.".into()),
+        permissions: vec!["debugger".into(), "storage".into()],
+        ..Default::default()
+    };
+    let issues = validate_manifest(&manifest_debugger, &empty_pkg);
+    assert!(issues.iter().any(|i| i.code == "CWS-013"));
+}
+
+#[test]
+fn test_content_script_all_frames_wildcard_check() {
+    let empty_pkg = ExtensionPackage {
+        root_path: std::path::PathBuf::from("dummy"),
+        package_type: crx_gate::archive::PackageType::Directory,
+        extension_id: None,
+        files: HashMap::new(),
+        total_size: 0,
+    };
+
+    let manifest_all_frames = ManifestData {
+        manifest_version: Some(3),
+        name: Some("Frame Injector".into()),
+        version: Some("1.0.0".into()),
+        description: Some("Injects tracking and styling helper scripts into all frames across the web.".into()),
+        content_scripts: vec![crx_gate::manifest::validation::ContentScriptEntry {
+            matches: vec!["<all_urls>".into()],
+            all_frames: Some(true),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let issues = validate_manifest(&manifest_all_frames, &empty_pkg);
+    assert!(issues.iter().any(|i| i.code == "CWS-014"));
+}

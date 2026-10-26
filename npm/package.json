@@ -20,10 +20,23 @@
   ],
   "author": "crx-gate contributors",
   "license": "MIT",
+  "homepage": "https://github.com/jaw0r3k/crx-gate#readme",
+  "bugs": {
+    "url": "https://github.com/jaw0r3k/crx-gate/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/jaw0r3k/crx-gate.git"
   },
+  "funding": {
+    "type": "individual",
+    "url": "https://github.com/jaw0r3k/crx-gate"
+  },
+  "files": [
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
   "engines": {
     "node": ">=16.0.0"
   }

@@ -216,10 +216,18 @@ Run `crx-gate rules` to list all built-in security signatures and CWS rejection 
 | **`CWS-008`** | `MEDIUM` | MV3 Architecture | Unopenable side panel (manifest declares side panel without trigger) |
 | **`CWS-009`** | `HIGH` | Runtime Bug | `chrome.action.*` invoked without `"action"` key in manifest |
 | **`CWS-010`** | `HIGH` | Runtime Bug | Accessing `tab.url`/`tab.title` without declaring `"tabs"` permission |
+| **`CWS-011`** | `MEDIUM` | CWS Quality | Manifest description missing, < 25 chars, or keyword stuffing |
+| **`CWS-012`** | `CRITICAL` | CWS Policy | Compiling or instantiating remote WebAssembly bytecode |
+| **`CWS-013`** | `HIGH` | CWS Scrutiny | Declaring privileged `debugger` permission (Tier-3 manual review) |
+| **`CWS-014`** | `MEDIUM` | Frame Isolation | `all_frames: true` on wildcard `<all_urls>` injecting into third-party ad iframes |
 | **`PERM-DEAD`** | `LOW` | Least Privilege | Declared permission is never invoked in any extension code |
 | **`PERM-UNDECLARED`** | `HIGH` | Runtime Bug | Chrome API invoked in code without manifest permission |
 | **`PERM-OVERPRIVILEGED`** | `MEDIUM` | Least Privilege | Declaring `tabs` when only non-sensitive `tab.id` is read |
 | **`SEC-TAINT-LEAK`** | `CRITICAL` | DLP / Security | Confirmed data flow from sensitive source to network sink |
+| **`SEC-DOM-XSS`** | `CRITICAL` | DOM Security | Assignments to `.innerHTML` / `.outerHTML` or `document.write` |
+| **`SEC-EXTERNAL-MSG-INSECURE`** | `CRITICAL` | Access Control | `onMessageExternal` listener missing `sender.origin` validation |
+| **`SEC-KEYLOGGER-INPUT`** | `CRITICAL` | Malware / Spyware | Global keydown listeners or password input field snooping |
+| **`SEC-STORAGE-SYNC-CREDENTIALS`** | `HIGH` | Privacy & DLP | Plaintext credentials/tokens stored in unencrypted `chrome.storage.sync` |
 | **`SEC-C2-ENDPOINT`** | `CRITICAL` | Threat Intel | Hardcoded Discord webhook, Telegram bot, or Ngrok tunnel |
 | **`SEC-OBFUSCATION`** | `CRITICAL` | Malware | High Shannon entropy packed strings or obfuscation chains |
 | **`SEC-EXT-CONNECTABLE`** | `CRITICAL` | Security Hole | Wildcard `externally_connectable` matches exposing listeners to any website |

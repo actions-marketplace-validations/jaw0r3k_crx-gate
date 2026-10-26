@@ -189,6 +189,101 @@ impl Scanner {
                     });
                 }
             }
+
+            // DOM XSS: innerHTML, outerHTML, document.write
+            for xss in &report.dom_xss_findings {
+                if !self.config.is_waived("SEC-DOM-XSS", Some(&report.file_path)) {
+                    findings.push(ScanFinding {
+                        rule_id: "SEC-DOM-XSS".into(),
+                        title: "DOM-Based XSS Vulnerability (innerHTML / document.write)".into(),
+                        severity: "critical".into(),
+                        category: "Injection & DOM Security".into(),
+                        file_path: Some(report.file_path.clone()),
+                        line: Some(xss.line),
+                        col: Some(xss.col),
+                        snippet: Some(xss.snippet.clone()),
+                        description: format!("Dangerous {} detected. Assigning unsanitized input to innerHTML/document.write enables attacker code execution inside extension contexts.", xss.kind),
+                        remediation: "Use textContent, safe DOM APIs (createElement), or sanitize input with DOMPurify.".into(),
+                        cws_policy_ref: Some("CWS Content Security Policy & Safe DOM Manipulation".into()),
+                    });
+                }
+            }
+
+            // Insecure external messaging
+            for msg in &report.insecure_external_msg_findings {
+                if !self.config.is_waived("SEC-EXTERNAL-MSG-INSECURE", Some(&report.file_path)) {
+                    findings.push(ScanFinding {
+                        rule_id: "SEC-EXTERNAL-MSG-INSECURE".into(),
+                        title: "Unvalidated External Message Handler".into(),
+                        severity: "critical".into(),
+                        category: "Access Control & Messaging".into(),
+                        file_path: Some(report.file_path.clone()),
+                        line: Some(msg.line),
+                        col: Some(msg.col),
+                        snippet: Some(msg.snippet.clone()),
+                        description: "chrome.runtime.onMessageExternal listener does not check sender.origin, sender.url, or sender.id. Any website can trigger privileged background routines.".into(),
+                        remediation: "Validate sender.origin against a strict whitelist of trusted domains before processing external requests.".into(),
+                        cws_policy_ref: Some("Cross-Extension & External Messaging Security".into()),
+                    });
+                }
+            }
+
+            // Keylogger & password field snooping
+            for kl in &report.keylogger_findings {
+                if !self.config.is_waived("SEC-KEYLOGGER-INPUT", Some(&report.file_path)) {
+                    findings.push(ScanFinding {
+                        rule_id: "SEC-KEYLOGGER-INPUT".into(),
+                        title: "Global Keystroke / Password Input Snooping".into(),
+                        severity: "critical".into(),
+                        category: "Malware & Credential Harvesting".into(),
+                        file_path: Some(report.file_path.clone()),
+                        line: Some(kl.line),
+                        col: Some(kl.col),
+                        snippet: Some(kl.snippet.clone()),
+                        description: format!("Detected {}. Monitoring keystrokes or querying password fields across visited web pages resembles spyware/keylogger behavior.", kl.trigger),
+                        remediation: "Remove global key event listeners and password input selectors from content scripts.".into(),
+                        cws_policy_ref: Some("Chrome Web Store User Data Privacy & Malicious Software Policy".into()),
+                    });
+                }
+            }
+
+            // Plaintext credentials in chrome.storage.sync
+            for cred in &report.storage_sync_findings {
+                if !self.config.is_waived("SEC-STORAGE-SYNC-CREDENTIALS", Some(&report.file_path)) {
+                    findings.push(ScanFinding {
+                        rule_id: "SEC-STORAGE-SYNC-CREDENTIALS".into(),
+                        title: "Plaintext Credentials in chrome.storage.sync".into(),
+                        severity: "high".into(),
+                        category: "Data Loss Prevention & Privacy".into(),
+                        file_path: Some(report.file_path.clone()),
+                        line: Some(cred.line),
+                        col: Some(cred.col),
+                        snippet: Some(cred.snippet.clone()),
+                        description: format!("Storing sensitive credential '{}' in chrome.storage.sync. Google syncs this storage unencrypted across all user browser instances.", cred.key_name),
+                        remediation: "Store sensitive tokens in chrome.storage.session or encrypt data before saving.".into(),
+                        cws_policy_ref: Some("Chrome Storage API Best Practices".into()),
+                    });
+                }
+            }
+
+            // Remote WebAssembly compilation
+            for wasm in &report.remote_wasm_findings {
+                if !self.config.is_waived("CWS-012", Some(&report.file_path)) {
+                    findings.push(ScanFinding {
+                        rule_id: "CWS-012".into(),
+                        title: "Remote WebAssembly Compilation".into(),
+                        severity: "critical".into(),
+                        category: "CWS Policy Violation".into(),
+                        file_path: Some(report.file_path.clone()),
+                        line: Some(wasm.line),
+                        col: Some(wasm.col),
+                        snippet: Some(wasm.snippet.clone()),
+                        description: format!("Dynamic compilation of remote WebAssembly via {} violates Manifest V3 executable code policy.", wasm.api_name),
+                        remediation: "Bundle all WebAssembly (.wasm) modules locally inside the extension package.".into(),
+                        cws_policy_ref: Some("Chrome Web Store Executable Code Policy".into()),
+                    });
+                }
+            }
         }
 
         // 4. HTML CSP violations

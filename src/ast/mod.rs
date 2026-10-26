@@ -10,8 +10,10 @@ use swc_core::common::FileName;
 use swc_core::ecma::parser::{lexer::Lexer, EsSyntax, Parser, StringInput, Syntax};
 use swc_core::ecma::visit::VisitWith;
 pub use visitor::{
-    ApiCallRecord, AstScanner, DynamicCodeRecord, EntropyFinding, PostMessageFinding,
-    SuspiciousEndpointFinding, TaintSinkFinding, TaintSourceFinding, VariableAssignment,
+    ApiCallRecord, AstScanner, DomXssFinding, DynamicCodeRecord, EntropyFinding,
+    ExternalMessageFinding, KeyloggerFinding, PostMessageFinding, RemoteWasmFinding,
+    StorageSyncCredentialFinding, SuspiciousEndpointFinding, TaintSinkFinding,
+    TaintSourceFinding, VariableAssignment,
 };
 
 #[derive(Debug, Clone)]
@@ -28,6 +30,11 @@ pub struct AstFileReport {
     pub taint_sources: Vec<TaintSourceFinding>,
     pub taint_sinks: Vec<TaintSinkFinding>,
     pub assignments: Vec<VariableAssignment>,
+    pub dom_xss_findings: Vec<DomXssFinding>,
+    pub insecure_external_msg_findings: Vec<ExternalMessageFinding>,
+    pub keylogger_findings: Vec<KeyloggerFinding>,
+    pub storage_sync_findings: Vec<StorageSyncCredentialFinding>,
+    pub remote_wasm_findings: Vec<RemoteWasmFinding>,
     pub parse_errors: Vec<String>,
 }
 
@@ -76,6 +83,11 @@ pub fn analyze_js_content(file_path: &str, content: &str) -> AstFileReport {
                 taint_sources: scanner.taint_sources,
                 taint_sinks: scanner.taint_sinks,
                 assignments: scanner.assignments,
+                dom_xss_findings: scanner.dom_xss_findings,
+                insecure_external_msg_findings: scanner.insecure_external_msg_findings,
+                keylogger_findings: scanner.keylogger_findings,
+                storage_sync_findings: scanner.storage_sync_findings,
+                remote_wasm_findings: scanner.remote_wasm_findings,
                 parse_errors,
             }
         }
@@ -94,6 +106,11 @@ pub fn analyze_js_content(file_path: &str, content: &str) -> AstFileReport {
                 taint_sources: Vec::new(),
                 taint_sinks: Vec::new(),
                 assignments: Vec::new(),
+                dom_xss_findings: Vec::new(),
+                insecure_external_msg_findings: Vec::new(),
+                keylogger_findings: Vec::new(),
+                storage_sync_findings: Vec::new(),
+                remote_wasm_findings: Vec::new(),
                 parse_errors,
             }
         }
