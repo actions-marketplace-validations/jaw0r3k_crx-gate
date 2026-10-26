@@ -34,52 +34,36 @@ pub fn render_terminal_report(
 ) -> String {
     let mut out = String::new();
 
-    // Header Banner
+    // Clean modern CLI header
     out.push_str("\n");
     out.push_str(&format!(
-        "{}{}{}\n",
-        "╔══════════════════════════════════════════════════════════════════════════════╗"
-            .bright_cyan(),
-        "",
-        ""
+        "{} {}\n",
+        "crx-gate".bright_cyan().bold(),
+        format!("v{} — extension security & blast-radius audit", env!("CARGO_PKG_VERSION")).dimmed()
     ));
-    out.push_str(&format!(
-        "║ {:<76} ║\n",
-        "  CRX-GATE — Pre-Commit Extension Security & Permission Blast-Radius Audit"
-            .bright_white()
-            .bold()
-    ));
-    out.push_str(&format!(
-        "{}\n",
-        "╚══════════════════════════════════════════════════════════════════════════════╝"
-            .bright_cyan()
-    ));
+    out.push_str(&format!("{}\n", "─".repeat(78).dimmed()));
 
     // Meta box
     out.push_str(&format!(
-        "  {} Target:       {}\n",
-        "•".bright_blue(),
-        target_path.bright_white().bold()
+        "  Target:       {}\n",
+        target_path.bright_white()
     ));
     out.push_str(&format!(
-        "  {} Extension:    {} (v{}) [Manifest V{}]\n",
-        "•".bright_blue(),
-        extension_name.bright_green().bold(),
+        "  Extension:    {} (v{}) [Manifest V{}]\n",
+        extension_name.bold(),
         extension_version,
         manifest_version
     ));
     if let Some(id) = extension_id {
         out.push_str(&format!(
-            "  {} Computed ID:  {}\n",
-            "•".bright_blue(),
+            "  Computed ID:  {}\n",
             id.bright_yellow()
         ));
     }
     out.push_str(&format!(
-        "  {} Package Type: {} | Scanned in: {} ms\n\n",
-        "•".bright_blue(),
-        package_type.cyan(),
-        duration_ms.to_string().bright_magenta().bold()
+        "  Package Type: {} | Scanned in: {} ms\n\n",
+        package_type,
+        duration_ms
     ));
 
     // Grade Banner

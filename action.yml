@@ -76,7 +76,7 @@ runs:
             echo "$HOME/.crx-gate/bin" >> $GITHUB_PATH
           else
             echo "Falling back to cargo install --locked crx-gate..."
-            cargo install --locked crx-gate || npx @crx-gate/cli --help
+            cargo install --locked crx-gate || npx crx-gate --help
           fi
         fi
 

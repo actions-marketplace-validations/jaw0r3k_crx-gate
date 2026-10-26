@@ -1,82 +1,59 @@
-<div align="center">
+# crx-gate
 
-# 🛡️ crx-gate
-
-**Zero-Dependency CLI for Pre-Commit Extension Security, Permission Blast-Radius Auditing, and Chrome Web Store Rejection Prediction**
+Static security analyzer and permission linter for Chrome extensions. Statically inspects unpacked extension directories, `.zip` bundles, or `.crx` binaries in under 3ms.
 
 [![CI](https://github.com/jaw0r3k/crx-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/jaw0r3k/crx-gate/actions)
-[![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 [![Crates.io](https://img.shields.io/crates/v/crx-gate.svg)](https://crates.io/crates/crx-gate)
 [![npm](https://img.shields.io/npm/v/crx-gate.svg)](https://www.npmjs.com/package/crx-gate)
-[![Speed](https://img.shields.io/badge/Speed-%3C%205ms-brightgreen.svg)](#benchmarks)
-
-*Audit unpacked extension directories, `.zip` archives, and `.crx` binary packages in under 3 milliseconds.*
-
-</div>
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
 ---
 
-## 🎯 The Problem
+## Why crx-gate?
 
-Enterprise Browser Security Platforms (Island, Talon/Palo Alto, LayerX) and \$50k/year CASB suites bundle extension risk scoring inside bloated endpoint management agents. Developers and lean SecOps teams have had no fast, local, zero-dependency tool to audit `.crx` binaries or source builds inside CI/CD pipelines before deploying internal extensions or approving third-party tools.
+Browser extensions hold privileged access to user session cookies, DOM state, browsing history, and network requests. Standard web SAST tools (like ESLint or Semgrep) inspect generic JavaScript syntax, but are blind to Chrome extension attack vectors:
 
-General SAST tools (Semgrep, Snyk) scan for generic web vulnerabilities, but remain blind to:
-- Specific semantics of **Manifest V3** APIs and ephemeral service worker lifecycles.
-- **Dead permissions** (permissions declared in `manifest.json` but never invoked in code).
-- **Overprivileged permissions** (e.g. requesting `tabs` when only `tab.id` is read, without needing `tab.url`).
-- **DeclarativeNetRequest ruleset tampering** (stripping `Content-Security-Policy` or mutating `Cookie` headers).
-- **Data-exfiltration taint paths** connecting browser APIs (`chrome.cookies`, `chrome.tabs`, `document.cookie`) to network sinks (`fetch`, `navigator.sendBeacon`, `WebSocket`).
-- **Automated Chrome Web Store (CWS) rejection triggers** (missing icon files, banned `eval()`, inline scripts in HTML).
+- **Dead permissions**: APIs declared in `manifest.json` but never invoked anywhere in code.
+- **Overprivileged permissions**: Requesting `tabs` when only non-sensitive properties (like `tab.id`) are accessed.
+- **Data exfiltration taint paths**: Tracing data flow from sensitive sources (`chrome.cookies`, `chrome.tabs`, `document.cookie`) to outbound network sinks (`fetch`, `sendBeacon`, `WebSocket`).
+- **DeclarativeNetRequest tampering**: Rulesets that strip `Content-Security-Policy` or mutate `Cookie`/`Authorization` headers.
+- **Chrome Web Store rejection triggers**: Inline scripts in HTML, missing asset files, banned `eval()`, or unescaped `.innerHTML` assignments.
 
----
-
-## ⚡ Core Value Proposition
-
-`crx-gate` is a single, zero-dependency Rust binary, GitHub Action, and NPX runner that:
-1. **Scans in < 5ms**: Parallel AST traversal powered by `swc` and multi-threaded Rayon workers.
-2. **Deterministic Blast-Radius Scoring**: Computes a normalized 0–100 risk score and letter grades (A+ to F).
-3. **Static Taint Analysis Engine**: Custom directed graph engine tracing sensitive data sources to network sinks.
-4. **CWS Rejection Predictor**: Flags policy violations before submitting to the Chrome Developer Dashboard.
-5. **Zero-Dependency Native Archive Reader**: Reads unpacked folders, `.zip` files, and raw `.crx` (both CRX2 and CRX3 binary protobufs) without external dependencies.
-6. **Multi-Format Output**: Rich ANSI terminal tables, JSON, GitHub Markdown summary, and standard **SARIF v2.1.0** for native GitHub Code Scanning integration.
+`crx-gate` runs locally before code review or commits land, producing a deterministic blast-radius score (0–100) and catching submission blockers before human review.
 
 ---
 
-## 🚀 Quickstart
+## Installation
 
-### 1. Run instantly via `npx` (No installation needed)
+### Via `npx` (No installation needed)
 
 ```bash
-# Audit an unpacked extension directory
+# Audit an extension directory
 npx crx-gate audit ./dist
 
-# Generate standalone interactive HTML report
-npx crx-gate audit ./dist --format html --output report.html
-
-# Audit a packed .crx binary archive
-npx crx-gate audit ./my-extension.crx
-
-# Run diff between two versions
+# Compare blast-radius between releases
 npx crx-gate diff ./v1.0.0 ./v1.1.0
 ```
 
-### 2. Install Standalone Binary via Cargo
+### Via Cargo
 
 ```bash
 cargo install crx-gate
 ```
 
-### 3. Initialize Configuration
+### Pre-commit hook
 
-Generate a default `crx-gate.toml` configuration file in your project:
+Add `crx-gate` to your repository's `.pre-commit-config.yaml`:
 
-```bash
-crx-gate init
+```yaml
+repos:
+  - repo: https://github.com/jaw0r3k/crx-gate
+    rev: v0.1.0
+    hooks:
+      - id: crx-gate
 ```
 
-### 4. Pre-Commit Hook Integration
-
-Add `crx-gate` to your git pre-commit hooks to block risky permissions before commits land:
+Or install directly into `.git/hooks/pre-commit`:
 
 ```bash
 crx-gate hook install --ext-dir ./src
@@ -84,113 +61,106 @@ crx-gate hook install --ext-dir ./src
 
 ---
 
-## 📊 Terminal Output Preview
+## Usage
 
-```
-╔══════════════════════════════════════════════════════════════════════════════╗
-║   CRX-GATE — Pre-Commit Extension Security & Permission Blast-Radius Audit   ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-  • Target:       tests/fixtures/exfiltrator_leak
-  • Extension:    Suspicious Coupon Hunter (v1.0.0) [Manifest V3]
-  • Package Type: Unpacked Directory | Scanned in: 2 ms
+```text
+crx-gate [OPTIONS] [PATH] [COMMAND]
 
-  ┌──────────────────────────────┬──────────────────────────────┬──────────────────────────────┐
-  │  Blast Radius Grade: F       │  Score: 94 /100             │  Risk: CRITICAL BLAST RADIUS │
-  ├──────────────────────────────┴──────────────────────────────┴──────────────────────────────┤
-  │  CWS Submission Prediction: REJECTION LIKELY (POLICY VIOLATION)                           │
-  └────────────────────────────────────────────────────────────────────────────────────────────┘
-
-  [ Blast-Radius Risk Breakdown ]
-┌────────────────────────────┬───────┬──────┬─────────────────────┐
-│ Audit Vector               ┆ Score ┆ Cap  ┆ Status              │
-╞════════════════════════════╪═══════╪══════╪═════════════════════╡
-│ Manifest Permissions Blast ┆ 24    ┆ / 30 ┆ Over-privileged     │
-│ Host Permissions Scope     ┆ 25    ┆ / 25 ┆ Wildcard <all_urls> │
-│ Static Taint Exfiltration  ┆ 25    ┆ / 25 ┆ CONFIRMED LEAK      │
-│ Policy & Vulnerabilities   ┆ 20    ┆ / 20 ┆ Policy Rejection    │
-└────────────────────────────┴───────┴──────┴─────────────────────┘
-
-  🚨 CRITICAL: Confirmed Data Exfiltration Paths (Static Taint Engine)
-  Path #1: chrome.cookies.getAll ➔ fetch
-    └── Source: chrome.cookies.getAll (background.js:4)
-    └── Immediate call to sink: fetch (background.js:6)
-    └── Exfiltration Target: https://discord.com/api/webhooks/999999999/abcdef
+Commands:
+  audit        Audit an extension directory, .zip, or .crx archive
+  diff         Compare blast-radius and security posture between two extension versions
+  rules        List all built-in security rules and Chrome Web Store rejection heuristics
+  init         Initialize crx-gate configuration in the current repository
+  hook         Install git pre-commit hook
+  completions  Generate shell auto-completion scripts (bash, zsh, fish, powershell)
 ```
 
----
+### Audit an extension
 
-## 🔍 Extension Diffing Engine (`crx-gate diff`)
+```bash
+# Terminal table output
+crx-gate audit ./my-extension
 
-Reviewing extension updates or PR changes? `crx-gate diff` performs blast-radius delta comparisons:
+# Standalone interactive HTML report
+crx-gate audit ./my-extension --format html --output report.html
+
+# SARIF report for GitHub Code Scanning
+crx-gate audit ./my-extension --format sarif --output crx-gate.sarif
+
+# Machine-readable JSON output
+crx-gate audit ./my-extension --format json
+
+# Fail build if high or critical issues are found, or score exceeds 60
+crx-gate audit ./my-extension --fail-on high --max-score 60
+```
+
+### Diff two versions
+
+Catch permission creeps, new taint flows, or risk degradation in pull requests:
 
 ```bash
 crx-gate diff ./v1.0.0 ./v1.1.0 --fail-on-degradation
 ```
 
+```text
+Base:   v1.0.0
+Target: v1.1.0
+
+Score: 10 (Grade: A) -> 94 (Grade: F) | Delta: +84 (DEGRADATION / INCREASED RISK)
+
+Added Permissions:
+  + tabs
+  + cookies
+
+Expanded Host Scopes:
+  + <all_urls>
+
+1 New Data Exfiltration Path Introduced:
+  * chrome.cookies.getAll -> fetch
 ```
-  Base:   v1.0.0
-  Target: v1.1.0
 
-  Score: 10 (Grade: A) ➔ 94 (Grade: F) | Delta: +84 (DEGRADATION / INCREASED RISK)
+### Shell auto-completions
 
-  ➕ Added Permissions:
-    • tabs
-    • cookies
+Generate completion scripts for your shell:
 
-  🌐 Expanded Host Scopes:
-    • <all_urls>
+```bash
+# Bash
+crx-gate completions bash > ~/.local/share/bash-completion/completions/crx-gate
 
-  🚨 1 New Data Exfiltration Path Introduced in this PR/Commit!
-    • chrome.cookies.getAll ➔ fetch
-```
+# Zsh
+crx-gate completions zsh > ~/.zfunc/_crx-gate
 
----
-
-## 🤖 GitHub Action & Code Scanning (SARIF)
-
-### GitHub Actions Workflow (`.github/workflows/audit.yml`)
-
-```yaml
-name: Extension Security Audit
-
-on:
-  pull_request:
-    branches: [ "main" ]
-
-jobs:
-  crx-gate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run crx-gate Security Audit
-        uses: crx-gate/crx-gate@v1
-        with:
-          path: './extension-dist'
-          fail-on: 'high'
-          max-score: '60'
-          sarif: 'crx-gate.sarif'
-
-      - name: Upload SARIF to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: 'crx-gate.sarif'
+# Fish
+crx-gate completions fish > ~/.config/fish/completions/crx-gate.fish
 ```
 
 ---
 
-## ⚙️ Configuration (`crx-gate.toml`)
+## Configuration (`crx-gate.toml`)
 
-Create a `crx-gate.toml` in your repository root to configure thresholds and approved waivers:
+Initialize a configuration file with `crx-gate init`:
 
 ```toml
 [audit]
-fail_on = "high"        # none, low, medium, high, critical
-max_score = 60          # 0-100 threshold
+# Exit with code 1 if findings reach this severity: none, low, medium, high, critical
+fail_on = "high"
+
+# Maximum permissible blast-radius score (0 - 100)
+max_score = 60
+
+# Ignore dead permissions for frameworks with dynamic runtime bindings
 ignore_dead_permissions = false
 
-# Approved enterprise exceptions with justifications and expiry
+ignore_paths = [
+  "**/*.min.js.map",
+  "**/node_modules/**"
+]
+
+[rules]
+disabled_rules = []
+custom_exfiltration_endpoints = []
+
+# Documented exceptions with reason and expiration
 [[waivers]]
 rule_id = "CWS-004"
 path = "manifest.json"
@@ -200,48 +170,80 @@ expires = "2027-01-01"
 
 ---
 
-## 📋 Rule & Threat Intel Catalog
+## GitHub Actions
 
-Run `crx-gate rules` to list all built-in security signatures and CWS rejection heuristics:
+Run `crx-gate` in your CI workflow and upload findings directly to the **GitHub Security -> Code Scanning** tab:
 
-| Rule ID | Severity | Category | Description |
-| :--- | :--- | :--- | :--- |
-| **`CWS-001`** | `CRITICAL` | CWS Policy | Remote hosted code execution (`<script src="https://...">`) |
-| **`CWS-002`** | `CRITICAL` | CWS Policy | Dynamic string execution via `eval()`, `Function()`, or string `setTimeout` |
-| **`CWS-003`** | `CRITICAL` | CWS Rejection | Manifest references non-existent files (icons, background, popups) |
-| **`CWS-004`** | `HIGH` | Blast Radius | Broad wildcard host permissions (`<all_urls>`, `*://*/*`) |
-| **`CWS-005`** | `CRITICAL` | Deprecation | Use of deprecated Manifest V2 |
-| **`CWS-006`** | `HIGH` | CSP Violation | Inline scripts or inline event handlers (`onclick`) in HTML |
-| **`CWS-007`** | `MEDIUM` | MV3 Lifetime | In-memory global state in ephemeral service workers |
-| **`CWS-008`** | `MEDIUM` | MV3 Architecture | Unopenable side panel (manifest declares side panel without trigger) |
-| **`CWS-009`** | `HIGH` | Runtime Bug | `chrome.action.*` invoked without `"action"` key in manifest |
-| **`CWS-010`** | `HIGH` | Runtime Bug | Accessing `tab.url`/`tab.title` without declaring `"tabs"` permission |
-| **`CWS-011`** | `MEDIUM` | CWS Quality | Manifest description missing, < 25 chars, or keyword stuffing |
-| **`CWS-012`** | `CRITICAL` | CWS Policy | Compiling or instantiating remote WebAssembly bytecode |
-| **`CWS-013`** | `HIGH` | CWS Scrutiny | Declaring privileged `debugger` permission (Tier-3 manual review) |
-| **`CWS-014`** | `MEDIUM` | Frame Isolation | `all_frames: true` on wildcard `<all_urls>` injecting into third-party ad iframes |
-| **`PERM-DEAD`** | `LOW` | Least Privilege | Declared permission is never invoked in any extension code |
-| **`PERM-UNDECLARED`** | `HIGH` | Runtime Bug | Chrome API invoked in code without manifest permission |
-| **`PERM-OVERPRIVILEGED`** | `MEDIUM` | Least Privilege | Declaring `tabs` when only non-sensitive `tab.id` is read |
-| **`SEC-TAINT-LEAK`** | `CRITICAL` | DLP / Security | Confirmed data flow from sensitive source to network sink |
-| **`SEC-DOM-XSS`** | `CRITICAL` | DOM Security | Assignments to `.innerHTML` / `.outerHTML` or `document.write` |
-| **`SEC-EXTERNAL-MSG-INSECURE`** | `CRITICAL` | Access Control | `onMessageExternal` listener missing `sender.origin` validation |
-| **`SEC-KEYLOGGER-INPUT`** | `CRITICAL` | Malware / Spyware | Global keydown listeners or password input field snooping |
-| **`SEC-STORAGE-SYNC-CREDENTIALS`** | `HIGH` | Privacy & DLP | Plaintext credentials/tokens stored in unencrypted `chrome.storage.sync` |
-| **`SEC-C2-ENDPOINT`** | `CRITICAL` | Threat Intel | Hardcoded Discord webhook, Telegram bot, or Ngrok tunnel |
-| **`SEC-OBFUSCATION`** | `CRITICAL` | Malware | High Shannon entropy packed strings or obfuscation chains |
-| **`SEC-EXT-CONNECTABLE`** | `CRITICAL` | Security Hole | Wildcard `externally_connectable` matches exposing listeners to any website |
-| **`SEC-WAR-WILDCARD`** | `HIGH` | Fingerprinting | Wildcard `web_accessible_resources` enabling cross-site tracking |
-| **`DNR-TAMPER-CSP`** | `CRITICAL` | Security Tampering | Declarative Net Request rule stripping CSP or X-Frame-Options |
-| **`DNR-AUTH-THEFT`** | `CRITICAL` | Security Tampering | Declarative Net Request rule mutates `Cookie` or `Authorization` headers |
+```yaml
+name: Extension Security Audit
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run crx-gate
+        uses: jaw0r3k/crx-gate@v1
+        with:
+          path: './dist'
+          fail-on: 'high'
+          max-score: '60'
+          sarif: 'crx-gate.sarif'
+
+      - name: Upload SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'crx-gate.sarif'
+```
 
 ---
 
-## ⏱️ Benchmarks
+## Built-in Rules
 
-Benchmarked across unpacked extensions and bundled minified JavaScript:
+| Rule ID | Severity | Category | Description |
+| :--- | :--- | :--- | :--- |
+| `CWS-001` | Critical | CWS Policy | Remote hosted code execution (`<script src="https://...">`) |
+| `CWS-002` | Critical | CWS Policy | Dynamic code execution (`eval()`, `Function()`, string `setTimeout`) |
+| `CWS-003` | Critical | Packaging | Manifest references non-existent files (icons, popups, scripts) |
+| `CWS-004` | High | Host Scope | Excessive wildcard host permissions (`<all_urls>`, `*://*/*`) |
+| `CWS-005` | Critical | Deprecation | Use of deprecated Manifest V2 |
+| `CWS-006` | High | CSP Violation | Inline scripts or inline event handlers (`onclick`) in HTML |
+| `CWS-007` | Medium | MV3 Lifetime | In-memory global state in ephemeral service workers |
+| `CWS-008` | Medium | Architecture | Side panel declared without opening trigger |
+| `CWS-009` | High | Runtime Bug | `chrome.action.*` invoked without `"action"` key in manifest |
+| `CWS-010` | High | Runtime Bug | Accessing `tab.url`/`tab.title` without declaring `"tabs"` permission |
+| `CWS-011` | Medium | CWS Quality | Manifest description missing, < 25 chars, or keyword stuffing |
+| `CWS-012` | Critical | CWS Policy | Compiling or streaming remote WebAssembly bytecode |
+| `CWS-013` | High | CWS Scrutiny | Declaring privileged `debugger` permission (Tier-3 manual review) |
+| `CWS-014` | Medium | Frame Isolation | `all_frames: true` on wildcard `<all_urls>` injecting into third-party ad iframes |
+| `PERM-DEAD` | Low | Least Privilege | Declared permission is never invoked in any extension code |
+| `PERM-UNDECLARED` | High | Runtime Bug | Chrome API invoked in code without manifest permission |
+| `PERM-OVERPRIVILEGED` | Medium | Least Privilege | Declaring `tabs` when only non-sensitive `tab.id` is read |
+| `SEC-TAINT-LEAK` | Critical | DLP / Security | Confirmed data flow from sensitive source to network sink |
+| `SEC-DOM-XSS` | Critical | DOM Security | Assignments to `.innerHTML` / `.outerHTML` or `document.write` |
+| `SEC-EXTERNAL-MSG-INSECURE` | Critical | Access Control | `onMessageExternal` listener missing `sender.origin` validation |
+| `SEC-KEYLOGGER-INPUT` | Critical | Malware / Spyware | Global keydown listeners or password input field snooping |
+| `SEC-STORAGE-SYNC-CREDENTIALS` | High | Privacy & DLP | Plaintext credentials/tokens stored in unencrypted `chrome.storage.sync` |
+| `SEC-C2-ENDPOINT` | Critical | Threat Intel | Hardcoded Discord webhook, Telegram bot, or Ngrok tunnel |
+| `SEC-OBFUSCATION` | Critical | Malware | High Shannon entropy packed strings or obfuscation chains |
+| `SEC-EXT-CONNECTABLE` | Critical | Security Hole | Wildcard `externally_connectable` matches exposing listeners to any website |
+| `SEC-WAR-WILDCARD` | High | Fingerprinting | Wildcard `web_accessible_resources` enabling cross-site tracking |
+| `DNR-TAMPER-CSP` | Critical | Tampering | Declarative Net Request rule stripping CSP or X-Frame-Options |
+| `DNR-AUTH-THEFT` | Critical | Tampering | Declarative Net Request rule mutating `Cookie` or `Authorization` headers |
 
-| Extension Size | Files Analyzed | AST Traversal & Taint Analysis | Memory |
+---
+
+## Benchmarks
+
+Benchmarked on an Apple M-series / AMD Ryzen machine scanning extension bundles:
+
+| Extension Size | Files Analyzed | AST Traversal & Taint Analysis | Resident Memory |
 | :--- | :--- | :--- | :--- |
 | **Small MV3 Extension** | 5 files | **1.8 ms** | < 12 MB |
 | **Medium Extension (Bundled)** | 28 files | **3.4 ms** | < 18 MB |
@@ -249,9 +251,10 @@ Benchmarked across unpacked extensions and bundled minified JavaScript:
 
 ---
 
-## 📄 License
+## License
 
 Licensed under either of:
+
 - Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
 - MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
 

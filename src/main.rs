@@ -1,4 +1,5 @@
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
+use clap_complete::{generate, Shell};
 use colored::*;
 use crx_gate::config::Config;
 use crx_gate::signatures::BUILTIN_RULES;
@@ -81,6 +82,12 @@ enum Commands {
         #[command(subcommand)]
         action: HookAction,
     },
+    /// Generate shell auto-completion scripts
+    Completions {
+        /// Shell to generate completions for
+        #[arg(value_enum)]
+        shell: Shell,
+    },
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -119,6 +126,11 @@ fn main() -> ExitCode {
         Some(Commands::Rules { category }) => run_rules(category.clone()),
         Some(Commands::Init { force }) => run_init(*force),
         Some(Commands::Hook { action }) => run_hook(action.clone()),
+        Some(Commands::Completions { shell }) => {
+            let mut cmd = Cli::command();
+            generate(*shell, &mut cmd, "crx-gate", &mut std::io::stdout());
+            ExitCode::SUCCESS
+        }
         None => {
             if let Some(path) = &cli.path {
                 run_audit(path.clone(), &cli, &config)
