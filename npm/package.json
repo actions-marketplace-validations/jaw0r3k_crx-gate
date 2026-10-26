@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Zero-dependency pre-commit extension security, permission blast-radius auditing, and CWS rejection prediction",
   "bin": {
-    "crx-gate": "./bin/crx-gate.js"
+    "crx-gate": "bin/crx-gate.js"
   },
   "scripts": {
     "test": "node bin/crx-gate.js --help"
@@ -22,7 +22,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/crx-gate/crx-gate"
+    "url": "git+https://github.com/crx-gate/crx-gate.git"
   },
   "engines": {
     "node": ">=16.0.0"
