@@ -236,6 +236,10 @@ jobs:
 | `SEC-WAR-WILDCARD` | High | Fingerprinting | Wildcard `web_accessible_resources` enabling cross-site tracking |
 | `DNR-TAMPER-CSP` | Critical | Tampering | Declarative Net Request rule stripping CSP or X-Frame-Options |
 | `DNR-AUTH-THEFT` | Critical | Tampering | Declarative Net Request rule mutating `Cookie` or `Authorization` headers |
+| `WARN-MV3-BROWSER-ACTION` | High | Compatibility | Deprecated `browser_action`/`page_action` used in MV3 (popup will fail) |
+| `WARN-MV3-BACKGROUND-SCRIPTS` | Critical | Compatibility | Deprecated `background.scripts` declared in MV3 without service worker |
+| `WARN-MV3-CSP-STRING` | Critical | Compatibility | Legacy string CSP used in MV3 instead of dictionary object |
+| `WARN-MV3-WEBREQUEST-BLOCKING` | High | Compatibility | Deprecated `webRequestBlocking` permission declared in MV3 |
 
 ---
 

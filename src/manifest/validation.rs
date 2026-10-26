@@ -397,5 +397,62 @@ pub fn validate_manifest(manifest: &ManifestData, package: &ExtensionPackage) ->
         }
     }
 
+    // 16. MV3 Migration: browser_action / page_action
+    if manifest.manifest_version == Some(3) {
+        if manifest.browser_action.is_some() || manifest.page_action.is_some() {
+            let old_key = if manifest.browser_action.is_some() { "browser_action" } else { "page_action" };
+            issues.push(ValidationIssue {
+                code: "WARN-MV3-BROWSER-ACTION".into(),
+                severity: "high".into(),
+                message: format!("Manifest V3 replaced '{}' with 'action'. Chrome will ignore '{}', causing your toolbar icon and popup to fail silently.", old_key, old_key),
+                file_reference: Some("manifest.json".into()),
+                remediation: format!("Rename '{}' to 'action' in manifest.json.", old_key),
+            });
+        }
+    }
+
+    // 17. MV3 Migration: background.scripts vs service_worker
+    if manifest.manifest_version == Some(3) {
+        if let Some(bg) = &manifest.background {
+            if bg.service_worker.is_none() && !bg.scripts.is_empty() {
+                issues.push(ValidationIssue {
+                    code: "WARN-MV3-BACKGROUND-SCRIPTS".into(),
+                    severity: "critical".into(),
+                    message: "In Manifest V3, background scripts are replaced by service workers. Declaring 'background.scripts' without 'background.service_worker' prevents the background process from running in Chrome.".into(),
+                    file_reference: Some("manifest.json".into()),
+                    remediation: "Migrate background scripts into a service worker: replace 'scripts: [\"...\"]' with 'service_worker: \"...\".'".into(),
+                });
+            }
+        }
+    }
+
+    // 18. MV3 Migration: Content Security Policy format
+    if manifest.manifest_version == Some(3) {
+        if let Some(csp_val) = &manifest.content_security_policy {
+            if csp_val.is_string() {
+                issues.push(ValidationIssue {
+                    code: "WARN-MV3-CSP-STRING".into(),
+                    severity: "critical".into(),
+                    message: "In Manifest V3, 'content_security_policy' must be an object with 'extension_pages' and/or 'sandbox' keys, not a string. Chrome will fail to parse this manifest.".into(),
+                    file_reference: Some("manifest.json".into()),
+                    remediation: "Convert content_security_policy to an object: '\"content_security_policy\": { \"extension_pages\": \"...\" }'.".into(),
+                });
+            }
+        }
+    }
+
+    // 19. MV3 Migration: webRequestBlocking
+    if manifest.manifest_version == Some(3) {
+        if manifest.permissions.iter().any(|p| p == "webRequestBlocking") {
+            issues.push(ValidationIssue {
+                code: "WARN-MV3-WEBREQUEST-BLOCKING".into(),
+                severity: "high".into(),
+                message: "Manifest V3 disables blocking web requests via 'webRequestBlocking' for consumer extensions. Use 'declarativeNetRequest' for declarative header/request rules.".into(),
+                file_reference: Some("manifest.json".into()),
+                remediation: "Migrate request interception logic to declarativeNetRequest rulesets.".into(),
+            });
+        }
+    }
+
     issues
 }

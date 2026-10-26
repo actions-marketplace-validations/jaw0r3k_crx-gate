@@ -320,3 +320,95 @@ fn test_content_script_all_frames_wildcard_check() {
     let issues = validate_manifest(&manifest_all_frames, &empty_pkg);
     assert!(issues.iter().any(|i| i.code == "CWS-014"));
 }
+
+#[test]
+fn test_warn_mv3_browser_action_migration() {
+    let empty_pkg = ExtensionPackage {
+        root_path: std::path::PathBuf::from("dummy"),
+        package_type: crx_gate::archive::PackageType::Directory,
+        extension_id: None,
+        files: HashMap::new(),
+        total_size: 0,
+    };
+
+    let manifest = ManifestData {
+        manifest_version: Some(3),
+        name: Some("MV3 with MV2 popup".into()),
+        version: Some("1.0.0".into()),
+        description: Some("Extension testing deprecated browser_action key in manifest v3.".into()),
+        browser_action: Some(serde_json::json!({ "default_popup": "popup.html" })),
+        ..Default::default()
+    };
+    let issues = validate_manifest(&manifest, &empty_pkg);
+    assert!(issues.iter().any(|i| i.code == "WARN-MV3-BROWSER-ACTION"));
+}
+
+#[test]
+fn test_warn_mv3_background_scripts_migration() {
+    let empty_pkg = ExtensionPackage {
+        root_path: std::path::PathBuf::from("dummy"),
+        package_type: crx_gate::archive::PackageType::Directory,
+        extension_id: None,
+        files: HashMap::new(),
+        total_size: 0,
+    };
+
+    let manifest = ManifestData {
+        manifest_version: Some(3),
+        name: Some("MV3 with MV2 bg".into()),
+        version: Some("1.0.0".into()),
+        description: Some("Extension testing background.scripts instead of service worker.".into()),
+        background: Some(crx_gate::manifest::validation::BackgroundEntry {
+            service_worker: None,
+            scripts: vec!["background.js".into()],
+            r#type: None,
+        }),
+        ..Default::default()
+    };
+    let issues = validate_manifest(&manifest, &empty_pkg);
+    assert!(issues.iter().any(|i| i.code == "WARN-MV3-BACKGROUND-SCRIPTS"));
+}
+
+#[test]
+fn test_warn_mv3_csp_string_migration() {
+    let empty_pkg = ExtensionPackage {
+        root_path: std::path::PathBuf::from("dummy"),
+        package_type: crx_gate::archive::PackageType::Directory,
+        extension_id: None,
+        files: HashMap::new(),
+        total_size: 0,
+    };
+
+    let manifest = ManifestData {
+        manifest_version: Some(3),
+        name: Some("MV3 with String CSP".into()),
+        version: Some("1.0.0".into()),
+        description: Some("Extension testing legacy string content security policy format.".into()),
+        content_security_policy: Some(serde_json::json!("script-src 'self' 'unsafe-eval'")),
+        ..Default::default()
+    };
+    let issues = validate_manifest(&manifest, &empty_pkg);
+    assert!(issues.iter().any(|i| i.code == "WARN-MV3-CSP-STRING"));
+}
+
+#[test]
+fn test_warn_mv3_webrequest_blocking_migration() {
+    let empty_pkg = ExtensionPackage {
+        root_path: std::path::PathBuf::from("dummy"),
+        package_type: crx_gate::archive::PackageType::Directory,
+        extension_id: None,
+        files: HashMap::new(),
+        total_size: 0,
+    };
+
+    let manifest = ManifestData {
+        manifest_version: Some(3),
+        name: Some("MV3 Blocking".into()),
+        version: Some("1.0.0".into()),
+        description: Some("Extension testing deprecated webRequestBlocking permission in MV3.".into()),
+        permissions: vec!["webRequestBlocking".into(), "storage".into()],
+        ..Default::default()
+    };
+    let issues = validate_manifest(&manifest, &empty_pkg);
+    assert!(issues.iter().any(|i| i.code == "WARN-MV3-WEBREQUEST-BLOCKING"));
+}

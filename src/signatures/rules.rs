@@ -286,6 +286,42 @@ pub static BUILTIN_RULES: &[RuleDefinition] = &[
         cws_policy_reference: Some("Manifest V3 Content Script Isolation"),
         remediation: "Set 'all_frames: false' or scope matches strictly to trusted domains.",
     },
+    RuleDefinition {
+        id: "WARN-MV3-BROWSER-ACTION",
+        title: "Deprecated browser_action / page_action in Manifest V3",
+        category: "MV3 Compatibility",
+        default_severity: RuleSeverity::High,
+        description: "Manifest V3 replaced 'browser_action' and 'page_action' with 'action'. Chrome silently ignores this key, disabling your extension toolbar popup or icon.",
+        cws_policy_reference: Some("Migrate to Manifest V3: Action API"),
+        remediation: "Rename 'browser_action' or 'page_action' to 'action' in manifest.json.",
+    },
+    RuleDefinition {
+        id: "WARN-MV3-BACKGROUND-SCRIPTS",
+        title: "Deprecated background.scripts in Manifest V3",
+        category: "MV3 Compatibility",
+        default_severity: RuleSeverity::Critical,
+        description: "Manifest V3 replaces background pages/scripts with service workers. Declaring 'background.scripts' without 'service_worker' prevents the background process from running.",
+        cws_policy_reference: Some("Migrate to Manifest V3: Service Workers"),
+        remediation: "Replace 'background.scripts: [...]' with 'background.service_worker: \"...\"'.",
+    },
+    RuleDefinition {
+        id: "WARN-MV3-CSP-STRING",
+        title: "Deprecated String Content Security Policy in MV3",
+        category: "MV3 Compatibility",
+        default_severity: RuleSeverity::Critical,
+        description: "In Manifest V3, 'content_security_policy' must be an object with 'extension_pages' and/or 'sandbox', not a plain string.",
+        cws_policy_reference: Some("Migrate to Manifest V3: Content Security Policy"),
+        remediation: "Convert content_security_policy to an object: '\"content_security_policy\": { \"extension_pages\": \"...\" }'.",
+    },
+    RuleDefinition {
+        id: "WARN-MV3-WEBREQUEST-BLOCKING",
+        title: "Deprecated webRequestBlocking in Manifest V3",
+        category: "MV3 Compatibility",
+        default_severity: RuleSeverity::High,
+        description: "Manifest V3 disables blocking web requests via 'webRequestBlocking' for consumer extensions. Request interception must use 'declarativeNetRequest'.",
+        cws_policy_reference: Some("Migrate to Manifest V3: Declarative Net Request"),
+        remediation: "Migrate request interception and header mutation logic to declarativeNetRequest rulesets.",
+    },
 ];
 
 pub fn get_rule(id: &str) -> Option<&'static RuleDefinition> {
