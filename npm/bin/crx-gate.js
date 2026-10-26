@@ -6,7 +6,7 @@ const path = require("path");
 const os = require("os");
 const https = require("https");
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 const REPO = "jaw0r3k/crx-gate";
 
 function getBinaryName() {

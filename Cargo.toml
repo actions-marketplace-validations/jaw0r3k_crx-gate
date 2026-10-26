@@ -1,6 +1,6 @@
 [package]
 name = "crx-gate"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["crx-gate contributors"]
 description = "Zero-dependency CLI for pre-commit extension security, permission blast-radius auditing, and CWS rejection prediction"

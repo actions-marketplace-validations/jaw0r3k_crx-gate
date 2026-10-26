@@ -1,6 +1,6 @@
 {
   "name": "crx-gate",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Zero-dependency pre-commit extension security, permission blast-radius auditing, and CWS rejection prediction",
   "bin": {
     "crx-gate": "bin/crx-gate.js"
