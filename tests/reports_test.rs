@@ -110,6 +110,60 @@ fn test_json_report_serialization_roundtrip() {
 }
 
 #[test]
+fn test_html_report_generation() {
+    let score = BlastRadiusScore {
+        total_score: 85,
+        grade: "F".into(),
+        risk_level: RiskLevel::Critical,
+        breakdown: ScoreBreakdown {
+            permissions_score: 25,
+            host_scope_score: 25,
+            taint_exfiltration_score: 25,
+            vulnerability_score: 10,
+        },
+        predicted_cws_verdict: "REJECTION_LIKELY".into(),
+        critical_count: 2,
+        high_count: 0,
+        medium_count: 0,
+        low_count: 0,
+    };
+
+    let findings = vec![ScanFinding {
+        rule_id: "SEC-C2-ENDPOINT".into(),
+        title: "C2 Webhook Detected".into(),
+        severity: "critical".into(),
+        category: "Threat Intel".into(),
+        file_path: Some("background.js".into()),
+        line: Some(15),
+        col: Some(4),
+        snippet: Some("fetch('https://discord.com/api/webhooks/...')".into()),
+        description: "Hardcoded Discord webhook".into(),
+        remediation: "Remove webhook".into(),
+        cws_policy_ref: None,
+    }];
+
+    let html = crx_gate::report::render_html_report(
+        "./test-ext",
+        "Directory",
+        Some("dummy_ext_id"),
+        "HTML Test Ext",
+        "2.0.0",
+        3,
+        &score,
+        &findings,
+        &[],
+        2,
+    );
+
+    assert!(html.contains("<!DOCTYPE html>"));
+    assert!(html.contains("HTML Test Ext"));
+    assert!(html.contains("SEC-C2-ENDPOINT"));
+    assert!(html.contains("85/100"));
+    assert!(html.contains("CRITICAL RISK"));
+    assert!(html.contains("dummy_ext_id"));
+}
+
+#[test]
 fn test_markdown_report_formatting() {
     let score = BlastRadiusScore {
         total_score: 95,

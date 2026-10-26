@@ -150,3 +150,81 @@ fn test_manifest_validation_catches_unsafe_csp() {
     assert!(issues.iter().any(|i| i.code == "CWS-CSP-UNSAFE-EVAL"));
     assert!(issues.iter().any(|i| i.code == "CWS-CSP-REMOTE-SOURCES"));
 }
+
+#[test]
+fn test_manifest_validation_catches_externally_connectable_wildcards() {
+    let manifest_wildcard = ManifestData {
+        manifest_version: Some(3),
+        name: Some("Wildcard Connectable".into()),
+        version: Some("1.0.0".into()),
+        externally_connectable: Some(crx_gate::manifest::validation::ExternallyConnectableEntry {
+            matches: vec!["*://*/*".into()],
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let empty_pkg = ExtensionPackage {
+        root_path: std::path::PathBuf::from("dummy"),
+        package_type: crx_gate::archive::PackageType::Directory,
+        extension_id: None,
+        files: HashMap::new(),
+        total_size: 0,
+    };
+
+    let issues = validate_manifest(&manifest_wildcard, &empty_pkg);
+    assert!(issues.iter().any(|i| i.code == "SEC-EXT-CONNECTABLE"));
+
+    // Verify safe explicit matches do NOT trigger it
+    let manifest_safe = ManifestData {
+        manifest_version: Some(3),
+        name: Some("Safe Connectable".into()),
+        version: Some("1.0.0".into()),
+        externally_connectable: Some(crx_gate::manifest::validation::ExternallyConnectableEntry {
+            matches: vec!["https://auth.internal-corp.com/*".into()],
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let issues_safe = validate_manifest(&manifest_safe, &empty_pkg);
+    assert!(!issues_safe.iter().any(|i| i.code == "SEC-EXT-CONNECTABLE"));
+}
+
+#[test]
+fn test_manifest_validation_catches_web_accessible_resources_wildcard() {
+    let manifest_wildcard = ManifestData {
+        manifest_version: Some(3),
+        name: Some("Wildcard WAR".into()),
+        version: Some("1.0.0".into()),
+        web_accessible_resources: vec![serde_json::json!({
+            "resources": ["assets/logo.png"],
+            "matches": ["*://*/*"]
+        })],
+        ..Default::default()
+    };
+
+    let empty_pkg = ExtensionPackage {
+        root_path: std::path::PathBuf::from("dummy"),
+        package_type: crx_gate::archive::PackageType::Directory,
+        extension_id: None,
+        files: HashMap::new(),
+        total_size: 0,
+    };
+
+    let issues = validate_manifest(&manifest_wildcard, &empty_pkg);
+    assert!(issues.iter().any(|i| i.code == "SEC-WAR-WILDCARD"));
+
+    // Verify safe scoped matches do NOT trigger it
+    let manifest_safe = ManifestData {
+        manifest_version: Some(3),
+        name: Some("Safe WAR".into()),
+        version: Some("1.0.0".into()),
+        web_accessible_resources: vec![serde_json::json!({
+            "resources": ["assets/logo.png"],
+            "matches": ["https://partner.com/*"]
+        })],
+        ..Default::default()
+    };
+    let issues_safe = validate_manifest(&manifest_safe, &empty_pkg);
+    assert!(!issues_safe.iter().any(|i| i.code == "SEC-WAR-WILDCARD"));
+}

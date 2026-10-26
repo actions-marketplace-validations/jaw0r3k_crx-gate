@@ -28,7 +28,19 @@ pub struct ManifestData {
     pub declarative_net_request: Option<DnrRuleResourcesEntry>,
     pub content_security_policy: Option<serde_json::Value>,
     pub sandbox: Option<SandboxEntry>,
+    pub externally_connectable: Option<ExternallyConnectableEntry>,
+    #[serde(default)]
+    pub web_accessible_resources: Vec<serde_json::Value>,
     pub key: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ExternallyConnectableEntry {
+    #[serde(default)]
+    pub matches: Vec<String>,
+    #[serde(default)]
+    pub ids: Vec<String>,
+    pub accept_tls_channel_id: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -78,7 +90,7 @@ pub struct SandboxEntry {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValidationIssue {
     pub code: String,
-    pub severity: String, // "critical", "high", "medium", "low"
+    pub severity: String,
     pub message: String,
     pub file_reference: Option<String>,
     pub remediation: String,
@@ -293,6 +305,41 @@ pub fn validate_manifest(manifest: &ManifestData, package: &ExtensionPackage) ->
                 file_reference: Some("manifest.json".into()),
                 remediation: "Bundle all third-party libraries locally within the extension directory.".into(),
             });
+        }
+    }
+
+    // 11. Externally Connectable Wildcard Check
+    if let Some(ext_conn) = &manifest.externally_connectable {
+        for pattern in &ext_conn.matches {
+            if pattern == "<all_urls>" || pattern == "*://*/*" || pattern == "https://*/*" {
+                issues.push(ValidationIssue {
+                    code: "SEC-EXT-CONNECTABLE".into(),
+                    severity: "critical".into(),
+                    message: format!("'externally_connectable.matches' declares wildcard pattern '{}'. Any arbitrary webpage on the web can invoke extension service worker message listeners.", pattern),
+                    file_reference: Some("manifest.json".into()),
+                    remediation: "Restrict externally_connectable.matches to explicit verified domains belonging to your organization.".into(),
+                });
+            }
+        }
+    }
+
+    // 12. Web Accessible Resources Wildcard Check
+    for war in &manifest.web_accessible_resources {
+        if let Some(matches) = war.get("matches").and_then(|m| m.as_array()) {
+            for match_pat in matches {
+                if let Some(pat_str) = match_pat.as_str() {
+                    if pat_str == "<all_urls>" || pat_str == "*://*/*" {
+                        issues.push(ValidationIssue {
+                            code: "SEC-WAR-WILDCARD".into(),
+                            severity: "high".into(),
+                            message: "web_accessible_resources declares wildcard match pattern (*://*/*). Exposing resources universally enables fingerprinting of installed extensions by malicious websites.".into(),
+                            file_reference: Some("manifest.json".into()),
+                            remediation: "Scope web_accessible_resources matches to specific required domains or dynamic resource keys.".into(),
+                        });
+                        break;
+                    }
+                }
+            }
         }
     }
 

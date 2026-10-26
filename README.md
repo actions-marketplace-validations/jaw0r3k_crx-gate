@@ -50,6 +50,9 @@ General SAST tools (Semgrep, Snyk) scan for generic web vulnerabilities, but rem
 # Audit an unpacked extension directory
 npx crx-gate audit ./dist
 
+# Generate standalone interactive HTML report
+npx crx-gate audit ./dist --format html --output report.html
+
 # Audit a packed .crx binary archive
 npx crx-gate audit ./my-extension.crx
 
@@ -63,7 +66,15 @@ npx crx-gate diff ./v1.0.0 ./v1.1.0
 cargo install crx-gate
 ```
 
-### 3. Pre-Commit Hook Integration
+### 3. Initialize Configuration
+
+Generate a default `crx-gate.toml` configuration file in your project:
+
+```bash
+crx-gate init
+```
+
+### 4. Pre-Commit Hook Integration
 
 Add `crx-gate` to your git pre-commit hooks to block risky permissions before commits land:
 
@@ -211,6 +222,8 @@ Run `crx-gate rules` to list all built-in security signatures and CWS rejection 
 | **`SEC-TAINT-LEAK`** | `CRITICAL` | DLP / Security | Confirmed data flow from sensitive source to network sink |
 | **`SEC-C2-ENDPOINT`** | `CRITICAL` | Threat Intel | Hardcoded Discord webhook, Telegram bot, or Ngrok tunnel |
 | **`SEC-OBFUSCATION`** | `CRITICAL` | Malware | High Shannon entropy packed strings or obfuscation chains |
+| **`SEC-EXT-CONNECTABLE`** | `CRITICAL` | Security Hole | Wildcard `externally_connectable` matches exposing listeners to any website |
+| **`SEC-WAR-WILDCARD`** | `HIGH` | Fingerprinting | Wildcard `web_accessible_resources` enabling cross-site tracking |
 | **`DNR-TAMPER-CSP`** | `CRITICAL` | Security Tampering | Declarative Net Request rule stripping CSP or X-Frame-Options |
 | **`DNR-AUTH-THEFT`** | `CRITICAL` | Security Tampering | Declarative Net Request rule mutates `Cookie` or `Authorization` headers |
 

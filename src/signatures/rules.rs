@@ -131,7 +131,7 @@ pub static BUILTIN_RULES: &[RuleDefinition] = &[
         default_severity: RuleSeverity::Low,
         description: "Permission is requested in manifest.json but never referenced in any JavaScript or HTML file across the codebase.",
         cws_policy_reference: Some("Single Purpose & Permissions Minimization"),
-        remediation: "Remove unused permission from manifest.json to reduce blast radius and user installation warnings.",
+        remediation: "Remove unused permission from manifest.json to reduce blast radius and avoid unnecessary user warnings.",
     },
     RuleDefinition {
         id: "PERM-UNDECLARED",
@@ -177,6 +177,24 @@ pub static BUILTIN_RULES: &[RuleDefinition] = &[
         description: "Static taint analysis traced unverified data flow from a sensitive source (cookies, tabs, passwords, identity) into an outbound network sink.",
         cws_policy_reference: Some("User Data Privacy & Exfiltration"),
         remediation: "Ensure credentials and private browsing data are not leaked to external servers.",
+    },
+    RuleDefinition {
+        id: "SEC-EXT-CONNECTABLE",
+        title: "Permissive Externally Connectable Wildcard",
+        category: "Attack Surface & Exposure",
+        default_severity: RuleSeverity::Critical,
+        description: "Manifest externally_connectable.matches contains broad wildcards (*://*/* or <all_urls>). Any arbitrary website can exchange messages with extension service workers.",
+        cws_policy_reference: Some("Cross-Extension & External Messaging Security"),
+        remediation: "Restrict externally_connectable.matches to explicit verified domains belonging to your organization.",
+    },
+    RuleDefinition {
+        id: "SEC-WAR-WILDCARD",
+        title: "Overly Permissive Web Accessible Resources",
+        category: "Extension Fingerprinting & Leak",
+        default_severity: RuleSeverity::High,
+        description: "web_accessible_resources declares broad wildcard matches (*://*/*). Exposing resources allows websites to fingerprint installed extensions or bypass origin isolation.",
+        cws_policy_reference: Some("Manifest V3 Web Accessible Resources"),
+        remediation: "Scope web_accessible_resources matches to specific origins or use dynamic resources.",
     },
     RuleDefinition {
         id: "DNR-TAMPER-CSP",

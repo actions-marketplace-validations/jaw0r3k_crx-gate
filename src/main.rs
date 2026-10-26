@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use colored::*;
 use crx_gate::config::Config;
 use crx_gate::signatures::BUILTIN_RULES;
-use crx_gate::{render_json_report, render_markdown_report, render_terminal_report, generate_sarif_report, Scanner};
+use crx_gate::{render_html_report, render_json_report, render_markdown_report, render_terminal_report, generate_sarif_report, Scanner};
 use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -22,7 +22,7 @@ struct Cli {
     /// Path to extension directory, .zip, or .crx archive (shorthand for 'audit <PATH>')
     path: Option<PathBuf>,
 
-    /// Output format: table, json, sarif, markdown
+    /// Output format: table, json, sarif, markdown, html
     #[arg(short, long, value_enum, default_value_t = OutputFormat::Table, global = true)]
     format: OutputFormat,
 
@@ -70,6 +70,12 @@ enum Commands {
         #[arg(long)]
         category: Option<String>,
     },
+    /// Initialize crx-gate configuration and CI workflow in the current repository
+    Init {
+        /// Overwrite existing crx-gate.toml if present
+        #[arg(long)]
+        force: bool,
+    },
     /// Git hook integration helper
     Hook {
         #[command(subcommand)]
@@ -96,6 +102,7 @@ enum OutputFormat {
     Json,
     Sarif,
     Markdown,
+    Html,
 }
 
 fn main() -> ExitCode {
@@ -110,6 +117,7 @@ fn main() -> ExitCode {
             fail_on_degradation,
         }) => run_diff(base.clone(), target.clone(), *fail_on_degradation, &cli, &config),
         Some(Commands::Rules { category }) => run_rules(category.clone()),
+        Some(Commands::Init { force }) => run_init(*force),
         Some(Commands::Hook { action }) => run_hook(action.clone()),
         None => {
             if let Some(path) = &cli.path {
@@ -160,6 +168,18 @@ fn run_audit(path: PathBuf, cli: &Cli, config: &Config) -> ExitCode {
                     serde_json::to_string_pretty(&sarif).unwrap_or_default()
                 }
                 OutputFormat::Markdown => render_markdown_report(
+                    &result.target_path,
+                    &result.package_type,
+                    result.extension_id.as_deref(),
+                    &result.extension_name,
+                    &result.extension_version,
+                    result.manifest_version,
+                    &result.score,
+                    &result.findings,
+                    &result.taint_paths,
+                    result.execution_duration_ms,
+                ),
+                OutputFormat::Html => render_html_report(
                     &result.target_path,
                     &result.package_type,
                     result.extension_id.as_deref(),
@@ -319,6 +339,54 @@ fn run_rules(category_filter: Option<String>) -> ExitCode {
         println!("  Fix:         {}\n", rule.remediation.green());
     }
 
+    ExitCode::SUCCESS
+}
+
+fn run_init(force: bool) -> ExitCode {
+    let toml_path = std::path::Path::new("crx-gate.toml");
+    if toml_path.exists() && !force {
+        eprintln!(
+            "{} crx-gate.toml already exists. Use '--force' to overwrite.",
+            "Warning:".bright_yellow().bold()
+        );
+        return ExitCode::from(1);
+    }
+
+    let default_toml = r#"# crx-gate configuration file
+[audit]
+# Exit code 1 when findings meet or exceed this severity: none, low, medium, high, critical
+fail_on = "high"
+
+# Maximum permissible blast radius score (0 - 100)
+max_score = 60
+
+# Ignore dead permissions for frameworks with dynamic runtime bindings
+ignore_dead_permissions = false
+
+ignore_paths = [
+  "**/*.min.js.map",
+  "**/node_modules/**",
+  "**/.git/**"
+]
+
+[rules]
+disabled_rules = []
+custom_exfiltration_endpoints = []
+
+# [[waivers]]
+# rule_id = "CWS-004"
+# path = "manifest.json"
+# reason = "Corporate proxy enforcement extension requires <all_urls>"
+# expires = "2027-01-01"
+"#;
+
+    if let Err(e) = fs::write(toml_path, default_toml) {
+        eprintln!("Failed to write crx-gate.toml: {}", e);
+        return ExitCode::from(1);
+    }
+
+    println!("{} Created crx-gate.toml", "✓ Success:".bright_green().bold());
+    println!("Run 'crx-gate audit <PATH>' or 'crx-gate hook install' to get started.");
     ExitCode::SUCCESS
 }
 

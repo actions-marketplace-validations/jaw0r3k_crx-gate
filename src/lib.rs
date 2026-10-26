@@ -17,7 +17,7 @@ pub use diff::DiffReport;
 use dnr::analyze_dnr_rulesets;
 use manifest::{api_to_permission, ManifestReport, KNOWN_PERMISSIONS};
 pub use report::table::ScanFinding;
-pub use report::{render_json_report, render_markdown_report, render_terminal_report, generate_sarif_report, JsonReport, SarifReport};
+pub use report::{render_html_report, render_json_report, render_markdown_report, render_terminal_report, generate_sarif_report, JsonReport, SarifReport};
 pub use scorer::{compute_blast_radius, BlastRadiusScore, RiskLevel};
 use serde::{Deserialize, Serialize};
 use signatures::rules::get_rule;

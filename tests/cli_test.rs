@@ -115,3 +115,70 @@ fn test_cli_rules_listing() {
     assert!(stdout.contains("CWS-001"));
     assert!(stdout.contains("CWS-002"));
 }
+
+#[test]
+fn test_cli_audit_html_format() {
+    let bin = get_bin_path();
+    let output = Command::new(&bin)
+        .args(&["audit", "tests/fixtures/clean_mv3", "--format", "html"])
+        .output()
+        .expect("Failed to execute crx-gate binary");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("<!DOCTYPE html>"));
+    assert!(stdout.contains("Clean Focus Timer"));
+    assert!(stdout.contains("crx-gate Security Audit"));
+}
+
+#[test]
+fn test_cli_audit_markdown_format() {
+    let bin = get_bin_path();
+    let output = Command::new(&bin)
+        .args(&["audit", "tests/fixtures/clean_mv3", "--format", "markdown"])
+        .output()
+        .expect("Failed to execute crx-gate binary");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("# 🛡️ crx-gate Security & Blast-Radius Audit"));
+    assert!(stdout.contains("Clean Focus Timer"));
+    assert!(stdout.contains("Blast-Radius Grade"));
+}
+
+#[test]
+fn test_cli_init_and_hook_install() {
+    let bin = get_bin_path();
+    let temp_dir = std::env::temp_dir().join(format!("crx_gate_cli_test_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+
+    // 1. Run init
+    let init_output = Command::new(&bin)
+        .args(&["init"])
+        .current_dir(&temp_dir)
+        .output()
+        .expect("Failed to execute init");
+    let stdout = String::from_utf8_lossy(&init_output.stdout);
+    let stderr = String::from_utf8_lossy(&init_output.stderr);
+    assert!(init_output.status.success(), "Init failed!\nSTDOUT: {}\nSTDERR: {}", stdout, stderr);
+    let config_path = temp_dir.join("crx-gate.toml");
+    assert!(config_path.exists(), "crx-gate.toml must be created");
+
+    // 2. Prepare mock .git/hooks directory and test hook install
+    let hooks_dir = temp_dir.join(".git").join("hooks");
+    std::fs::create_dir_all(&hooks_dir).unwrap();
+
+    let hook_output = Command::new(&bin)
+        .args(&["hook", "install"])
+        .current_dir(&temp_dir)
+        .output()
+        .expect("Failed to execute hook install");
+    assert!(hook_output.status.success());
+    let hook_file = hooks_dir.join("pre-commit");
+    assert!(hook_file.exists(), ".git/hooks/pre-commit must be created");
+
+    let hook_content = std::fs::read_to_string(&hook_file).unwrap();
+    assert!(hook_content.contains("crx-gate audit"));
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
