@@ -190,7 +190,7 @@ impl TaintGraphEngine {
                 }
             } else {
                 for sink in &self.sinks {
-                    if sink.file == src.file && sink.line >= src.line && (sink.line - src.line) <= 5 {
+                    if sink.file == src.file && sink.line == src.line {
                         let sink_loc = format!("{}:{}", sink.file, sink.line);
                         let path_key = format!("{}->{}", src_loc, sink_loc);
 
@@ -206,12 +206,12 @@ impl TaintGraphEngine {
                                 sink_target_url: sink.target_url.clone(),
                                 flow_trace: vec![
                                     format!("Source: {} ({})", src.api, src_loc),
-                                    format!("Immediate call to sink: {} ({}:{})", sink.api, sink.file, sink.line),
+                                    format!("Direct nested call to sink: {} ({}:{})", sink.api, sink.file, sink.line),
                                 ],
                                 severity: "critical".into(),
                                 title: "Direct Sensitive Data Ingestion into Network Sink".into(),
                                 description: format!(
-                                    "Sensitive source '{}' is invoked immediately adjacent to network sink '{}'.",
+                                    "Sensitive source '{}' is invoked directly within network sink '{}'.",
                                     src.api, sink.api
                                 ),
                                 remediation: "Do not pass sensitive browser state into outbound network requests.".into(),

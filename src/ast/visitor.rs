@@ -144,7 +144,12 @@ impl<'a> Visit for AstScanner<'a> {
             let target_name = target_ident.id.sym.to_string();
 
             if let Some(init) = &n.init {
-                if let Expr::Call(call) = &**init {
+                let init_expr = match &**init {
+                    Expr::Await(aw) => &*aw.arg,
+                    other => other,
+                };
+
+                if let Expr::Call(call) = init_expr {
                     if let Callee::Expr(callee_expr) = &call.callee {
                         if let Some(api) = self.check_member_chain(callee_expr) {
                             if is_sensitive_source(&api) {
@@ -157,10 +162,22 @@ impl<'a> Visit for AstScanner<'a> {
                                     col: loc.col_display,
                                     file_path: self.file_path.to_string(),
                                 });
+                            } else if api == "JSON.stringify" || api == "btoa" || api == "encodeURIComponent" || api == "String" {
+                                if let Some(arg0) = call.args.first() {
+                                    if let Expr::Ident(src_ident) = &*arg0.expr {
+                                        let loc = self.loc(n.span);
+                                        self.assignments.push(VariableAssignment {
+                                            target: target_name.clone(),
+                                            source_var: src_ident.sym.to_string(),
+                                            line: loc.line,
+                                            file_path: self.file_path.to_string(),
+                                        });
+                                    }
+                                }
                             }
                         }
                     }
-                } else if let Expr::Member(member) = &**init {
+                } else if let Expr::Member(member) = init_expr {
                     if let Some(chain) = self.check_member_chain(&Expr::Member(member.clone())) {
                         if is_sensitive_source(&chain) {
                             let loc = self.loc(member.span);
@@ -174,7 +191,7 @@ impl<'a> Visit for AstScanner<'a> {
                             });
                         }
                     }
-                } else if let Expr::Ident(src_ident) = &**init {
+                } else if let Expr::Ident(src_ident) = init_expr {
                     let loc = self.loc(n.span);
                     self.assignments.push(VariableAssignment {
                         target: target_name.clone(),
@@ -199,7 +216,12 @@ impl<'a> Visit for AstScanner<'a> {
         };
 
         if let Some(target) = target_name {
-            if let Expr::Ident(src) = &*n.right {
+            let right_expr = match &*n.right {
+                Expr::Await(aw) => &*aw.arg,
+                other => other,
+            };
+
+            if let Expr::Ident(src) = right_expr {
                 let loc = self.loc(n.span);
                 self.assignments.push(VariableAssignment {
                     target,
@@ -207,7 +229,7 @@ impl<'a> Visit for AstScanner<'a> {
                     line: loc.line,
                     file_path: self.file_path.to_string(),
                 });
-            } else if let Expr::Call(call) = &*n.right {
+            } else if let Expr::Call(call) = right_expr {
                 if let Callee::Expr(callee_expr) = &call.callee {
                     if let Some(api) = self.check_member_chain(callee_expr) {
                         if is_sensitive_source(&api) {
@@ -220,6 +242,18 @@ impl<'a> Visit for AstScanner<'a> {
                                 col: loc.col_display,
                                 file_path: self.file_path.to_string(),
                             });
+                        } else if api == "JSON.stringify" || api == "btoa" || api == "encodeURIComponent" || api == "String" {
+                            if let Some(arg0) = call.args.first() {
+                                if let Expr::Ident(src_ident) = &*arg0.expr {
+                                    let loc = self.loc(n.span);
+                                    self.assignments.push(VariableAssignment {
+                                        target,
+                                        source_var: src_ident.sym.to_string(),
+                                        line: loc.line,
+                                        file_path: self.file_path.to_string(),
+                                    });
+                                }
+                            }
                         }
                     }
                 }
@@ -322,14 +356,17 @@ impl<'a> Visit for AstScanner<'a> {
                     }
 
                     if is_sensitive_source(&chain) {
-                        self.taint_sources.push(TaintSourceFinding {
-                            source_type: classify_source(&chain),
-                            api_name: chain.clone(),
-                            assigned_var: None,
-                            line: loc.line,
-                            col: loc.col_display,
-                            file_path: self.file_path.to_string(),
-                        });
+                        let already_tracked = self.taint_sources.iter().any(|s| s.line == loc.line);
+                        if !already_tracked {
+                            self.taint_sources.push(TaintSourceFinding {
+                                source_type: classify_source(&chain),
+                                api_name: chain.clone(),
+                                assigned_var: None,
+                                line: loc.line,
+                                col: loc.col_display,
+                                file_path: self.file_path.to_string(),
+                            });
+                        }
                     }
                 }
 

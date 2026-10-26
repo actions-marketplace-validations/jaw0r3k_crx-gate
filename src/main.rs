@@ -20,7 +20,6 @@ struct Cli {
     command: Option<Commands>,
 
     /// Path to extension directory, .zip, or .crx archive (shorthand for 'audit <PATH>')
-    #[arg(global = true)]
     path: Option<PathBuf>,
 
     /// Output format: table, json, sarif, markdown
@@ -68,7 +67,7 @@ enum Commands {
     /// List all built-in security rules and Chrome Web Store rejection heuristics
     Rules {
         /// Filter rules by category or severity
-        #[arg(short, long)]
+        #[arg(long)]
         category: Option<String>,
     },
     /// Git hook integration helper

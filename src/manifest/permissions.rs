@@ -222,12 +222,51 @@ lazy_static! {
     };
 }
 
-/// Identifies if an API string belongs to a required permission
+/// Deterministically maps a chrome.* API call to its required manifest permission
 pub fn api_to_permission(api_call: &str) -> Option<&'static str> {
-    for (perm, info) in KNOWN_PERMISSIONS.iter() {
-        if api_call.starts_with(info.api_prefix) {
-            return Some(perm);
-        }
+    if api_call.starts_with("chrome.cookies") {
+        Some("cookies")
+    } else if api_call.starts_with("chrome.tabs") {
+        Some("tabs")
+    } else if api_call.starts_with("chrome.scripting") {
+        Some("scripting")
+    } else if api_call.starts_with("chrome.storage") {
+        Some("storage")
+    } else if api_call.starts_with("chrome.alarms") {
+        Some("alarms")
+    } else if api_call.starts_with("chrome.history") {
+        Some("history")
+    } else if api_call.starts_with("chrome.bookmarks") {
+        Some("bookmarks")
+    } else if api_call.starts_with("chrome.contextMenus") {
+        Some("contextMenus")
+    } else if api_call.starts_with("chrome.notifications") {
+        Some("notifications")
+    } else if api_call.starts_with("chrome.identity") {
+        Some("identity")
+    } else if api_call.starts_with("chrome.management") {
+        Some("management")
+    } else if api_call.starts_with("chrome.offscreen") {
+        Some("offscreen")
+    } else if api_call.starts_with("chrome.sidePanel") {
+        Some("sidePanel")
+    } else if api_call.starts_with("chrome.userScripts") {
+        Some("userScripts")
+    } else if api_call.starts_with("chrome.debugger") {
+        Some("debugger")
+    } else if api_call.starts_with("chrome.declarativeNetRequest") {
+        Some("declarativeNetRequest")
+    } else if api_call.starts_with("chrome.webRequest") {
+        Some("webRequest")
+    } else if api_call.starts_with("chrome.webNavigation") {
+        Some("webNavigation")
+    } else if api_call.starts_with("chrome.idle") {
+        Some("idle")
+    } else if api_call.starts_with("chrome.power") {
+        Some("power")
+    } else if api_call.starts_with("chrome.tts") {
+        Some("tts")
+    } else {
+        None
     }
-    None
 }
