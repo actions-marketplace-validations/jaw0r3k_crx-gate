@@ -22,7 +22,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/crx-gate/crx-gate.git"
+    "url": "git+https://github.com/jaw0r3k/crx-gate.git"
   },
   "engines": {
     "node": ">=16.0.0"

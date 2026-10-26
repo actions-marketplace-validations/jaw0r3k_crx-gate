@@ -137,7 +137,7 @@ pub fn generate_sarif_report(findings: &[ScanFinding]) -> SarifReport {
                 driver: SarifDriver {
                     name: "crx-gate".into(),
                     version: env!("CARGO_PKG_VERSION").into(),
-                    information_uri: "https://github.com/crx-gate/crx-gate".into(),
+                    information_uri: "https://github.com/jaw0r3k/crx-gate".into(),
                     rules,
                 },
             },

@@ -4,7 +4,7 @@
 
 **Zero-Dependency CLI for Pre-Commit Extension Security, Permission Blast-Radius Auditing, and Chrome Web Store Rejection Prediction**
 
-[![CI](https://github.com/crx-gate/crx-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/crx-gate/crx-gate/actions)
+[![CI](https://github.com/jaw0r3k/crx-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/jaw0r3k/crx-gate/actions)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 [![Crates.io](https://img.shields.io/crates/v/crx-gate.svg)](https://crates.io/crates/crx-gate)
 [![npm](https://img.shields.io/npm/v/crx-gate.svg)](https://www.npmjs.com/package/crx-gate)
