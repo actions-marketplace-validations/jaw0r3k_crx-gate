@@ -1,0 +1,30 @@
+{
+  "name": "crx-gate",
+  "version": "0.1.0",
+  "description": "Zero-dependency pre-commit extension security, permission blast-radius auditing, and CWS rejection prediction",
+  "bin": {
+    "crx-gate": "./bin/crx-gate.js"
+  },
+  "scripts": {
+    "test": "node bin/crx-gate.js --help"
+  },
+  "keywords": [
+    "chrome-extension",
+    "crx",
+    "security",
+    "audit",
+    "manifest-v3",
+    "blast-radius",
+    "sast",
+    "taint-analysis"
+  ],
+  "author": "crx-gate contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/crx-gate/crx-gate"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

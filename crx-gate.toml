@@ -1,0 +1,34 @@
+# crx-gate configuration file
+
+[audit]
+# Exit code 1 when findings meet or exceed this severity: none, low, medium, high, critical
+fail_on = "high"
+
+# Maximum allowable blast-radius score (0 - 100) before triggering gate failure
+max_score = 60
+
+# Ignore dead permission warnings for libraries/frameworks that dynamically bind
+ignore_dead_permissions = false
+
+# Paths to ignore from AST scanning
+ignore_paths = [
+  "**/*.min.js.map",
+  "**/node_modules/**",
+  "**/.git/**"
+]
+
+[rules]
+# Globally disable specific rule IDs if necessary
+disabled_rules = []
+
+# Custom endpoints to flag as suspicious data-exfiltration sinks
+custom_exfiltration_endpoints = [
+  "https://custom-analytics-collector.internal"
+]
+
+# Waivers allow temporary exemptions for legacy code or intentional functionality
+[[waivers]]
+rule_id = "CWS-004"
+path = "manifest.json"
+reason = "Approved enterprise exception: Extension requires <all_urls> for corporate web filter enforcement."
+expires = "2027-01-01"

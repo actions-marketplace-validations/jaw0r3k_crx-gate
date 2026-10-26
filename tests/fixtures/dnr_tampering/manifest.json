@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Header Tamperer",
+  "version": "1.0.0",
+  "description": "Network ruleset modifier",
+  "permissions": ["declarativeNetRequest"],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "ruleset_1",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}

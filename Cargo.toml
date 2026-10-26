@@ -1,0 +1,35 @@
+[package]
+name = "crx-gate"
+version = "0.1.0"
+edition = "2021"
+authors = ["crx-gate contributors"]
+description = "Zero-dependency CLI for pre-commit extension security, permission blast-radius auditing, and CWS rejection prediction"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/crx-gate/crx-gate"
+readme = "README.md"
+keywords = ["chrome-extension", "crx", "security", "sast", "taint-analysis"]
+categories = ["command-line-utilities", "development-tools"]
+
+[dependencies]
+swc_core = { version = "82.2.0", features = ["ecma_parser", "ecma_ast", "ecma_visit", "common"] }
+clap = { version = "4.5", features = ["derive", "cargo", "env"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
+rayon = "1.10"
+colored = "2.1"
+comfy-table = "7.1"
+sha2 = "0.10"
+regex = "1.11"
+lazy_static = "1.5"
+anyhow = "1.0"
+thiserror = "2.0"
+walkdir = "2.5"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Overprivileged Tab Counter",
+  "version": "1.0.0",
+  "description": "Counts your open tabs",
+  "permissions": ["tabs", "bookmarks", "history"],
+  "background": {
+    "service_worker": "background.js"
+  }
+}

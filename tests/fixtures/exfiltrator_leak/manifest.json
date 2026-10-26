@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Suspicious Coupon Hunter",
+  "version": "1.0.0",
+  "description": "Find coupons automatically on any site",
+  "permissions": ["cookies", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  }
+}

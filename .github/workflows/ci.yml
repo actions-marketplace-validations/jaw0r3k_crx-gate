@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check-and-test:
+    name: Check, Test, and Audit
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Cargo Format Check
+        run: cargo fmt --check
+        if: matrix.os == 'ubuntu-latest'
+
+      - name: Cargo Check
+        run: cargo check --all-targets
+
+      - name: Run Test Suite
+        run: cargo test --verbose
+
+      - name: Build Release Binary
+        run: cargo build --release
+
+      - name: Test Self-Audit on Fixtures
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            BIN="./target/release/crx-gate.exe"
+          else
+            BIN="./target/release/crx-gate"
+          fi
+          $BIN audit tests/fixtures/clean_mv3 --benchmark
+          $BIN diff tests/fixtures/clean_mv3 tests/fixtures/exfiltrator_leak

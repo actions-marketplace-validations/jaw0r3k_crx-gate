@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Clean Focus Timer",
+  "version": "1.0.0",
+  "description": "Minimal focus timer extension",
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "permissions": ["storage", "alarms"],
+  "background": {
+    "service_worker": "background.js"
+  }
+}

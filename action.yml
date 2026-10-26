@@ -1,0 +1,103 @@
+name: 'crx-gate Security & Blast-Radius Audit'
+description: 'Zero-dependency pre-commit extension security, permission blast-radius auditing, and CWS rejection prediction'
+author: 'crx-gate contributors'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  path:
+    description: 'Path to unpacked extension directory, .zip, or .crx archive'
+    required: false
+    default: '.'
+  fail-on:
+    description: 'Severity threshold to fail the action: none, low, medium, high, critical'
+    required: false
+    default: 'high'
+  max-score:
+    description: 'Maximum allowable blast radius score (0-100) before failing gate'
+    required: false
+    default: '60'
+  sarif:
+    description: 'File path to save SARIF v2.1.0 report (for GitHub Code Scanning upload)'
+    required: false
+    default: ''
+  config:
+    description: 'Path to custom crx-gate.toml configuration file'
+    required: false
+    default: ''
+  version:
+    description: 'Version of crx-gate binary to download if not installed'
+    required: false
+    default: 'latest'
+
+outputs:
+  grade:
+    description: 'Blast radius letter grade (A+, A, B, C, D, F)'
+    value: ${{ steps.audit.outputs.grade }}
+  score:
+    description: 'Calculated blast radius score (0-100)'
+    value: ${{ steps.audit.outputs.score }}
+  verdict:
+    description: 'Predicted Chrome Web Store review outcome'
+    value: ${{ steps.audit.outputs.verdict }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up crx-gate CLI
+      shell: bash
+      run: |
+        if ! command -v crx-gate &> /dev/null; then
+          echo "Installing crx-gate standalone binary..."
+          OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          ARCH="$(uname -m)"
+          case "$ARCH" in
+            x86_64|amd64) ARCH="x86_64" ;;
+            aarch64|arm64) ARCH="aarch64" ;;
+            *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+          esac
+          case "$OS" in
+            linux*) PLATFORM="unknown-linux-gnu" ;;
+            darwin*) PLATFORM="apple-darwin" ;;
+            msys*|mingw*|cygwin*) PLATFORM="pc-windows-msvc" ;;
+            *) echo "Unsupported OS: $OS"; exit 1 ;;
+          esac
+          
+          TAG="${{ inputs.version }}"
+          if [ "$TAG" = "latest" ]; then
+            RELEASE_URL="https://github.com/crx-gate/crx-gate/releases/latest/download/crx-gate-${ARCH}-${PLATFORM}.tar.gz"
+          else
+            RELEASE_URL="https://github.com/crx-gate/crx-gate/releases/download/${TAG}/crx-gate-${ARCH}-${PLATFORM}.tar.gz"
+          fi
+          
+          mkdir -p "$HOME/.crx-gate/bin"
+          if curl -sSL "$RELEASE_URL" | tar -xz -C "$HOME/.crx-gate/bin" 2>/dev/null; then
+            echo "$HOME/.crx-gate/bin" >> $GITHUB_PATH
+          else
+            echo "Falling back to cargo install --locked crx-gate..."
+            cargo install --locked crx-gate || npx @crx-gate/cli --help
+          fi
+        fi
+
+    - name: Run crx-gate Audit
+      id: audit
+      shell: bash
+      run: |
+        ARGS=("audit" "${{ inputs.path }}" "--fail-on" "${{ inputs.fail-on }}" "--max-score" "${{ inputs.max-score }}")
+        
+        if [ -n "${{ inputs.config }}" ]; then
+          ARGS+=("--config" "${{ inputs.config }}")
+        fi
+
+        # Generate Markdown for GitHub Step Summary
+        crx-gate "${ARGS[@]}" --format markdown > crx_summary.md || true
+        cat crx_summary.md >> $GITHUB_STEP_SUMMARY
+
+        # Export SARIF if requested
+        if [ -n "${{ inputs.sarif }}" ]; then
+          crx-gate "${ARGS[@]}" --format sarif --output "${{ inputs.sarif }}" || true
+        fi
+
+        # Run primary terminal gate check
+        crx-gate "${ARGS[@]}"
