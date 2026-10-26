@@ -80,19 +80,22 @@ jobs:
     name: Publish NPX Runner Package
     needs: dist-build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
-      - name: Publish to npm
+      - name: Publish to npm (Trusted Publishing via OIDC)
         run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "::warning::NPM_TOKEN secret is not set. Skipping npm publish."
+          cd npm
+          if [ -n "${{ secrets.NPM_TOKEN }}" ]; then
+            echo "Publishing with NPM_TOKEN..."
+            NODE_AUTH_TOKEN="${{ secrets.NPM_TOKEN }}" npm publish --provenance --access public
           else
-            cd npm
+            echo "Publishing with npm Trusted Publishing (OIDC)..."
             npm publish --provenance --access public
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
