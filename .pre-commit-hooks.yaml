@@ -1,0 +1,7 @@
+- id: crx-gate
+  name: crx-gate
+  description: Pre-commit extension security, permission blast-radius auditing, and CWS rejection prediction
+  entry: crx-gate audit
+  language: rust
+  files: ^(manifest\.json|.*\.(js|ts|html))$
+  pass_filenames: false
